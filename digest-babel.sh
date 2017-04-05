@@ -2,31 +2,56 @@
 date=$(date +%F)
 threads=$(grep -c ^processor /proc/cpuinfo)
 
-babel_thread_sdf() {
-cd babel-output
-babel ../thread_$1.sdf --add 'formula HBA1 HBD InChIKey logP MW TPSA' -m -o sdf $1_$date.sdf &> ./babel-output-$date-$1.log
-echo Convertion of sdf files in thread $1 exited
-rm ../thread_$1.sdf
+sane() {
+if [[ -z "${sdf_files[@]}" ]] && [[ -z "${smi_files[@]}" ]]
+  then echo "No input file"
+  exit 2
+fi
+if [ "$threads" == '0' ]
+  then echo Please use a non zero thread count
+  exit 3
+  else count=($(eval echo {$threads..1}))
+fi
+for i in babel-output meta sdf-2d
+  do [ -e $i ] || mkdir $i
+done
 }
 
-babel_thread_smi() {
-cd babel-output
-babel ../thread_$1.smi --gen2d --add 'formula HBA1 HBD InChIKey logP MW TPSA' -m -o sdf $1_$date.sdf &> ./babel-output-$date-$1.log
-echo Convertion of smi files in thread $1 exited
-rm ../thread_$1.smi
-}
-
-split_file_smi() {
-lines=$(cat $@ | wc -l)
-lines_avg=$(( lines / threads ))
-last_line=1
+main_smi() {
+split_file_smi ${smi_files[@]}
+echo Converting sdf input files
 for i in ${count[@]}
-  do echo Splitting smi Files $i/$threads times
-  cat $@ | sed -n $last_line,$(( lines_avg + last_line ))p >> thread_$i.smi
-  last_line=$(( last_line + lines_avg ))
-  if [ "$i" == '1' ]
-    then cat $@ | tail -n +$(( last_line + 1 )) >> thread_1.smi
-  fi
+  do babel_thread_smi $i &
+done
+wait
+}
+
+main_sdf() {
+thread_prepare_sdf
+for i in ${sdf_files[@]}
+  do split_file_sdf $i
+done
+echo Converting sdf input files
+for i in ${count[@]}
+  do babel_thread_sdf $i &
+done
+wait
+}
+
+main() {
+[[ "${smi_files[@]}" ]] && main_smi
+[[ "${sdf_files[@]}" ]] && main_sdf
+echo Second Stage: Getting Info on each file and moving them
+for thread_i in ${count[@]}
+  do local=( $(find ./babel-output/ -mindepth 1 -name $thread_i'*') )
+  caser_wrap &
+done
+echo Please Wait for the the threads to exit
+wait
+echo Last Stage: Adding mySQL entries
+for i in meta/*
+  do add_to_sql "$i"
+  rm "$i"
 done
 }
 
@@ -35,14 +60,19 @@ files=0
 for i in ${sdf_files[@]}
   do files=$(( files + 1 ))
 done
-to_be_renamed=$(( files / threads ))
+divdummy=$(( files / threads ))
+i=0
+thread=1
+repeat=$(eval echo {1..$divdummy})
 
-for i in ${count[@]}
-  do for I in {1..$to_be_renamed}
-    do sdf_files=( ${sdf_files[@]} }
+while [ ! $thread -gt $threads ]
+  do for I in $repeat
+    do echo cat ${sdf_files[$i]} to thread_$thread
+    unset sdf_files[$i]
+    i=$(( i + 1 ))
   done
+  thread=$((thread + 1))
 done
-
 }
 
 split_file_sdf() {
@@ -72,19 +102,42 @@ cat $@ | tail -n +$last_line | while read line
 done
 }
 
-sane() {
-if [[ -z "${sdf_files[@]}" ]] && [[ -z "${smi_files[@]}" ]]
-  then echo "No input file"
-  exit 2
-fi
-if [ "$threads" == '0' ]
-  then echo Please use a non zero thread count
-  exit 3
-  else count=($(eval echo {$threads..1}))
-fi
-for i in babel-output meta sdf-2d
-  do [ -e $i ] || mkdir $i
+babel_thread_sdf() {
+cd babel-output
+babel ../thread_$1.sdf --add 'formula HBA1 HBD InChIKey logP MW TPSA' -m -o sdf $1_$date.sdf &> ./babel-output-$date-$1.log
+echo Convertion of sdf files in thread $1 exited
+rm ../thread_$1.sdf
+}
+
+split_file_smi() {
+lines=$(cat $@ | wc -l)
+lines_avg=$(( lines / threads ))
+last_line=1
+for i in ${count[@]}
+  do echo Splitting smi Files $i/$threads times
+  cat $@ | sed -n $last_line,$(( lines_avg + last_line ))p >> thread_$i.smi
+  last_line=$(( last_line + lines_avg ))
+  if [ "$i" == '1' ]
+    then cat $@ | tail -n +$(( last_line + 1 )) >> thread_1.smi
+  fi
 done
+}
+
+babel_thread_smi() {
+cd babel-output
+babel ../thread_$1.smi --gen2d --add 'formula HBA1 HBD InChIKey logP MW TPSA' -m -o sdf $1_$date.sdf &> ./babel-output-$date-$1.log
+echo Convertion of smi files in thread $1 exited
+rm ../thread_$1.smi
+}
+
+caser_wrap() {
+i=0
+while [ ! -z "${local[$i]}" ]
+  do caser $(grep '^>' -A1 --no-group-separator ${local[$i]} | tr -d '<> ')
+  i=$(( i + 1 ))
+done
+sleep 2s
+echo Thread $thread_i exited
 }
 
 caser() {
@@ -118,16 +171,6 @@ echo \"\",\""$PUBCHEM_EXT_DATASOURCE_REGID"\",\""$PUBCHEM_EXT_SUBSTANCE_URL"\",\
 mv "${local[$i]}" ./sdf-2d/$PUBCHEM_EXT_DATASOURCE_REGID.sdf
 }
 
-caser_wrap() {
-i=0
-while [ ! -z "${local[$i]}" ]
-  do caser $(grep '^>' -A1 --no-group-separator ${local[$i]} | tr -d '<> ')
-  i=$(( i + 1 ))
-done
-sleep 2s
-echo Thread $thread_i exited
-}
-
 add_to_sql() {
 mysql -u nikosf -pa -e "use BABEL" -e "
       LOAD DATA LOCAL INFILE '$@'
@@ -138,42 +181,6 @@ mysql -u nikosf -pa -e "use BABEL" -e "
 "
 }
 
-main_smi() {
-split_file_smi ${smi_files[@]}
-echo Converting sdf input files
-for i in ${count[@]}
-  do babel_thread_smi $i &
-done
-wait
-}
-
-main_sdf() {
-for i in ${sdf_files[@]}
-  do split_file_sdf $i
-done
-echo Converting sdf input files
-for i in ${count[@]}
-  do babel_thread_sdf $i &
-done
-wait
-}
-
-main() {
-[[ "${smi_files[@]}" ]] && main_smi
-[[ "${sdf_files[@]}" ]] && main_sdf
-echo Second Stage: Getting Info on each file and moving them
-for thread_i in ${count[@]}
-  do local=( $(find ./babel-output/ -mindepth 1 -name $thread_i'*') )
-  caser_wrap &
-done
-echo Please Wait for the the threads to exit
-wait
-echo Last Stage: Adding mySQL entries
-for i in meta/*
-  do add_to_sql "$i"
-  rm "$i"
-done
-}
 
 while true; do
   case $1 in
