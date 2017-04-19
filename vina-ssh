@@ -1,0 +1,50 @@
+#! /usr/bin/env bash
+#vina_cache="$HOME/.vina"
+ip=''
+user=''
+
+shift
+
+payload_create() {
+while true; do
+  case $1 in
+    receptor	) receptor=$(basename "$3"); vina_cache=$(dirname $3); shift 3;;
+    ligand	) ligand=$(basename "$3"); shift 3;;
+    center_x	) center_x="$3"; shift 3;;
+    center_y	) center_y="$3"; shift 3;;
+    center_z	) center_z="$3"; shift 3;;
+    size_x	) size_x="$3"; shift 3;;
+    size_y	) size_y="$3"; shift 3;;
+    size_z	) size_z="$3"; shift 3;;
+    out		) out=$(basename "$3"); shift 3;;
+    log		) log=$(basename "$3"); shift 3;;
+    num_modes	) num_modes="$3"; shift 3;;
+    ''		) break;;
+    *		) echo hi $1; shift 1;;
+  esac
+done
+}
+
+payload_create $(cat $@)
+payload="receptor = $receptor
+ligand = $ligand
+center_x = $center_x
+center_y = $center_y
+center_z = $center_z
+size_x = $size_x
+size_y = $size_y
+size_z = $size_z
+out = $out
+log = $log
+num_modes = $num_modes"
+
+scp $vina_cache/$receptor $vina_cache/$ligand $user@$ip:/tmp/
+
+echo "$payload" | ssh $user@$ip "mkdir ~/.vina_ssh &> /dev/null
+cd ~/.vina_ssh
+cp /tmp/$receptor /tmp/$ligand . &> /dev/null
+cat > ~/.vina_ssh/config_ssh.txt
+vina --config ~/.vina_ssh/config_ssh.txt &> /dev/null
+cat $out
+rm -rf ~/.vina_ssh &> /dev/null
+" > $vina_cache/$out
