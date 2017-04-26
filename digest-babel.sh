@@ -67,7 +67,7 @@ thread=1
 repeat=$(eval echo {1..$divdummy})
 while [ ! $thread -gt $threads ]
   do for I in $repeat
-    do cat ${sdf_files[$i]} >> thread_$thread
+    do cat ${sdf_files[$i]} >> thread_$thread.sdf
     unset sdf_files[$i]
     i=$(( i + 1 ))
   done
