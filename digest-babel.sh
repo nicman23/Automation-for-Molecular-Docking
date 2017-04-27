@@ -12,7 +12,7 @@ if [ "$threads" == '0' ]
   exit 3
   else count=($(eval echo {$threads..1}))
 fi
-for i in babel-output meta sdf-2d
+for i in babel-output meta sdf-2d babel-logs
   do [ -e $i ] || mkdir $i
 done
 }
@@ -32,6 +32,7 @@ for i in ${sdf_files[@]}
   do split_file_sdf $i
 done
 echo Converting sdf input files
+exit
 for i in ${count[@]}
   do babel_thread_sdf $i &
 done
@@ -43,7 +44,7 @@ main() {
 [[ "${sdf_files[@]}" ]] && main_sdf
 echo Second Stage: Getting Info on each file and moving them
 for thread_i in ${count[@]}
-  do local=( $(find ./babel-output/ -mindepth 1 -name $thread_i'*') )
+  do local=( $(find ./babel-output/ -mindepth 1 -name "$thread_i\_*") )
   caser_wrap &
 done
 echo Please Wait for the the threads to exit
@@ -104,7 +105,8 @@ done
 
 babel_thread_sdf() {
 cd babel-output
-babel ../thread_$1.sdf --add 'formula HBA1 HBD InChIKey logP MW TPSA' -m -o sdf $1_$date.sdf &> ./babel-output-$date-$1.log
+sed -e '{N;s/\$\$\$\$\n\$\$\$\$/\$\$\$\$/}' -i ../thread_$1.sdf
+babel ../thread_$1.sdf --add 'formula HBA1 HBD InChIKey logP MW TPSA' -m -o sdf $1_$date.sdf &> ../babel-logs/babel-output-$date-$1.log
 echo Convertion of sdf files in thread $1 exited
 rm ../thread_$1.sdf
 }
@@ -125,7 +127,7 @@ done
 
 babel_thread_smi() {
 cd babel-output
-babel ../thread_$1.smi --gen2d --add 'formula HBA1 HBD InChIKey logP MW TPSA' -m -o sdf $1_$date.sdf &> ./babel-output-$date-$1.log
+babel ../thread_$1.smi --gen2d --add 'formula HBA1 HBD InChIKey logP MW TPSA' -m -o sdf $1_$date.sdf &> ../babel-logs/babel-output-$date-$1.log
 echo Convertion of smi files in thread $1 exited
 rm ../thread_$1.smi
 }
@@ -134,6 +136,7 @@ caser_wrap() {
 i=0
 while [ ! -z "${local[$i]}" ]
   do caser $(grep '^>' -A1 --no-group-separator ${local[$i]} | tr -d '<> ')
+  mv "${local[$i]}" ./sdf-2d/$PUBCHEM_EXT_DATASOURCE_REGID.sdf
   i=$(( i + 1 ))
 done
 sleep 2s
@@ -168,7 +171,6 @@ while true; do
 done
 [ "$PUBCHEM_EXT_DATASOURCE_REGID" ] || local PUBCHEM_EXT_DATASOURCE_REGID=$(head -n1 ${local[$i]})
 echo \"\",\""$PUBCHEM_EXT_DATASOURCE_REGID"\",\""$PUBCHEM_EXT_SUBSTANCE_URL"\",\""$VERIFIED_AMOUNT_MG"\",\""$UNVERIFIED_AMOUNT_MG"\",\""$PRICERANGE_5MG"\",\""$PRICERANGE_1MG"\",\""$PRICERANGE_50MG"\",\""$IS_SC"\",\""$IS_BB"\",\""$COMPOUND_STATE"\",\""$QC_METHOD"\",\""$formula"\",\""$HBA1"\",\""$HBD"\",\""$InChIKey"\",\""$logP"\",\""$MW"\",\""$TPSA"\"  >> ./meta/$thread_i.csv
-mv "${local[$i]}" ./sdf-2d/$PUBCHEM_EXT_DATASOURCE_REGID.sdf
 }
 
 add_to_sql() {
@@ -195,3 +197,4 @@ done
 sane
 main
 wait
+
