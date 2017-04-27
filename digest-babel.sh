@@ -32,7 +32,6 @@ for i in ${sdf_files[@]}
   do split_file_sdf $i
 done
 echo Converting sdf input files
-exit
 for i in ${count[@]}
   do babel_thread_sdf $i &
 done
@@ -136,7 +135,6 @@ caser_wrap() {
 i=0
 while [ ! -z "${local[$i]}" ]
   do caser $(grep '^>' -A1 --no-group-separator ${local[$i]} | tr -d '<> ')
-  mv "${local[$i]}" ./sdf-2d/$PUBCHEM_EXT_DATASOURCE_REGID.sdf
   i=$(( i + 1 ))
 done
 sleep 2s
@@ -171,6 +169,7 @@ while true; do
 done
 [ "$PUBCHEM_EXT_DATASOURCE_REGID" ] || local PUBCHEM_EXT_DATASOURCE_REGID=$(head -n1 ${local[$i]})
 echo \"\",\""$PUBCHEM_EXT_DATASOURCE_REGID"\",\""$PUBCHEM_EXT_SUBSTANCE_URL"\",\""$VERIFIED_AMOUNT_MG"\",\""$UNVERIFIED_AMOUNT_MG"\",\""$PRICERANGE_5MG"\",\""$PRICERANGE_1MG"\",\""$PRICERANGE_50MG"\",\""$IS_SC"\",\""$IS_BB"\",\""$COMPOUND_STATE"\",\""$QC_METHOD"\",\""$formula"\",\""$HBA1"\",\""$HBD"\",\""$InChIKey"\",\""$logP"\",\""$MW"\",\""$TPSA"\"  >> ./meta/$thread_i.csv
+mv "${local[$i]}" ./sdf-2d/$PUBCHEM_EXT_DATASOURCE_REGID.sdf
 }
 
 add_to_sql() {
