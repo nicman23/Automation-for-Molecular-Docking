@@ -82,6 +82,7 @@ last_line=1
 for i in ${count[@]}
   do echo Splitting File $1: $i/$threads times
   cat $@ | sed -n $last_line,$(( lines_avg + last_line ))p >> thread_$i.sdf
+  [ ! -z "$(grep -Pzo '\$\$\$\$\n\$\$\$\$' $thread_$i.sdf)" ] && sed '$d' -i $thread_$i.sdf
   last_line=$(( last_line + lines_avg ))
   if [ "$i" == '1' ]
     then cat $@ | tail -n +$(( last_line + 1 )) >> thread_1.sdf
@@ -104,7 +105,6 @@ done
 
 babel_thread_sdf() {
 cd babel-output
-sed -e '{N;s/\$\$\$\$\n\$\$\$\$/\$\$\$\$/}' -i ../thread_$1.sdf
 babel ../thread_$1.sdf --add 'formula HBA1 HBD InChIKey logP MW TPSA' -m -o sdf $1_$date.sdf &> ../babel-logs/babel-output-$date-$1.log
 echo Convertion of sdf files in thread $1 exited
 rm ../thread_$1.sdf
