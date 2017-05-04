@@ -2,20 +2,19 @@
 
 main() {
 cd sdf-2d
+echo Finding 2d files
 allthemfiles=( $(find .) )
 cd ../sdf-3d
+echo Finding 3d Files
 allthemdonefiles=( $(find .) )
 cd ..
-for i in ${allthemdonefiles[@]}
-  do allthemfiles=( ${allthemfiles[@]/%$i} )
-done
-# compress array \#totaly not acrane bs
-allthemfiles=( ${allthemfiles[@]} )
+echo Removing already computed 3d files from array
 
+#this made me rethink life, our place in the universe and the upcoming singularity
+allthemfiles=$($(echo ${allthemdonefiles[@]} ${allthemfiles[@]} | tr ' ' '\n' | sort | uniq -u ))
 files=${#allthemfiles[@]}
 divdummy=$(( files / threads ))
 echo Converting sdf input files $files
-exit
 lastfile=0
 for thread_i in ${count[@]} last
   do [ "$thread_i" = 'last' ] && wait
