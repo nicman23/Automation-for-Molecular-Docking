@@ -29,7 +29,8 @@ wait
 babel_thread() {
 i=$1
 while [ ! "$i" -eq "$2" ]
-do timeout 20s obabel -i sdf ./sdf-2d/"${allthemfiles[$i]}" --gen3d -o sdf\
+do echo "${allthemfiles[$i]}" >> ./babel-logs/babel-output-gen3d-$date-thread-$thread_i.log
+  timeout 20s obabel -i sdf ./sdf-2d/"${allthemfiles[$i]}" --gen3d -o sdf\
   -O ./sdf-3d/$(basename "${allthemfiles[$i]}")\
   &>> ./babel-logs/babel-output-gen3d-$date-thread-$thread_i.log
   if [ ! "$?" == '0' ]

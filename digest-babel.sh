@@ -56,10 +56,7 @@ done
 }
 
 thread_prepare_sdf() {
-files=0
-for i in ${sdf_files[@]}
-  do files=$(( files + 1 ))
-done
+files=${#sdf_files[@]}
 divdummy=$(( files / threads ))
 [ "$divdummy" == '0' ] && return 0
 i=0
