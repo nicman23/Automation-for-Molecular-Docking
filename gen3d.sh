@@ -13,32 +13,35 @@ cd ..
 echo Removing already computed 3d files from array
 
 #this made me rethink life, our place in the universe and the upcoming singularity
-allthemfiles=($(echo "${allthemdonefiles[@]} ${allthemfiles[@]}" | tr ' ' '\n' | sort | uniq -u))
+allthemfiles=($(echo ${allthemdonefiles[@]} ${allthemfiles[@]} | tr ' ' '\n' | sort | uniq -u))
+allthemdonefiles=()
 files=${#allthemfiles[@]}
 divdummy=$(( files / threads ))
 echo Converting sdf input files $files
 lastfile=0
 for thread_i in ${count[@]} last
-  do [ "$thread_i" = 'last' ] && wait
-  babel_thread $lastfile $((lastfile + divdummy)) &
-  lastfile=$((lastfile + divdummy))
+  do local thread_files=( ${allthemfiles[@]:$lastfile:$divdummy} )
+  lastfile=$((lastfile + divdummy + 1))
+  babel_thread &
 done
+allthemfiles=()
 wait
+rm /tmp/gen3dpipe*
 }
 
 babel_thread() {
-i=$1
-while [ ! "$i" -eq "$2" ]
-do echo "${allthemfiles[$i]}" >> ./babel-logs/babel-output-gen3d-$date-thread-$thread_i.log
-  timeout 20s obabel -i sdf ./sdf-2d/"${allthemfiles[$i]}" --gen3d -o sdf\
-  -O ./sdf-3d/$(basename "${allthemfiles[$i]}")\
-  &>> ./babel-logs/babel-output-gen3d-$date-thread-$thread_i.log
-  if [ ! "$?" == '0' ]
-    then echo "${allthemfiles[$i]}" >> bad_sdfs &
-  fi
+i=0
+total=${#thread_files[@]}
+allthemfiles=()
+while [ "${thread_files[$i]}" ]
+  do echo "${thread_files[$i]}" >> ./babel-logs/babel-output-gen3d-$date-thread-$thread_i.log &
+  timeout 20s obabel -i sdf ./sdf-2d/"${thread_files[$i]}" --gen3d -o sdf\
+  -p 7.4 -O ./sdf-3d/$(basename "${thread_files[$i]}")\
+  &>> ./babel-logs/babel-output-gen3d-$date-thread-$thread_i.log || echo "${thread_files[$i]}" >> bad_sdfs
   i=$(( i + 1 ))
+  echo Thread $thread_i: $i /$total > /tmp/gen3dpipe$thread_i &
 done
-echo Thread $thread_i exited
+echo Thread $thread_i exited > /tmp/gen3dpipe$thread_i
 }
 
 sane() {

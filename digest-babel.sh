@@ -102,7 +102,7 @@ done
 
 babel_thread_sdf() {
 cd babel-output
-babel ../thread_$1.sdf --add 'formula HBA1 HBD InChIKey logP MW TPSA' -m -o sdf $1_$date.sdf &> ../babel-logs/babel-output-$date-$1.log
+obabel ../thread_$1.sdf --add 'formula HBA1 HBD InChIKey logP MW TPSA InChI' -p 7.4 -m -o sdf $1_$date.sdf &> ../babel-logs/babel-output-$date-$1.log
 echo Convertion of sdf files in thread $1 exited
 rm ../thread_$1.sdf
 }
@@ -123,7 +123,7 @@ done
 
 babel_thread_smi() {
 cd babel-output
-babel ../thread_$1.smi --gen2d --add 'formula HBA1 HBD InChIKey logP MW TPSA' -m -o sdf $1_$date.sdf &> ../babel-logs/babel-output-$date-$1.log
+obabel ../thread_$1.smi --gen2d --add 'formula HBA1 HBD InChIKey logP MW TPSA' -p 7.4 -m -o sdf $1_$date.sdf &> ../babel-logs/babel-output-$date-$1.log
 echo Convertion of smi files in thread $1 exited
 rm ../thread_$1.smi
 }
@@ -160,12 +160,19 @@ while true; do
     logP ) local logP="$2" ; shift 2 ;;
     MW ) local MW="$2" ; shift 2 ;;
     TPSA ) local TPSA="$2" ; shift 2 ;;
+    InChI ) local InChI="$2" ; shift 2 ;;
     '' ) break ;;
     * ) echo hi $1 ; shift 1;;
   esac
 done
 [ "$PUBCHEM_EXT_DATASOURCE_REGID" ] || local PUBCHEM_EXT_DATASOURCE_REGID=$(head -n1 ${local[$i]})
-echo \"\",\""$PUBCHEM_EXT_DATASOURCE_REGID"\",\""$PUBCHEM_EXT_SUBSTANCE_URL"\",\""$VERIFIED_AMOUNT_MG"\",\""$UNVERIFIED_AMOUNT_MG"\",\""$PRICERANGE_5MG"\",\""$PRICERANGE_1MG"\",\""$PRICERANGE_50MG"\",\""$IS_SC"\",\""$IS_BB"\",\""$COMPOUND_STATE"\",\""$QC_METHOD"\",\""$formula"\",\""$HBA1"\",\""$HBD"\",\""$InChIKey"\",\""$logP"\",\""$MW"\",\""$TPSA"\"  >> ./meta/$thread_i.csv
+local SMILES="$(obabel -i sdf ${local[$i]} -o smiles )"
+echo \"\",\""$PUBCHEM_EXT_DATASOURCE_REGID"\",\""$PUBCHEM_EXT_SUBSTANCE_URL"\"\
+,\""$VERIFIED_AMOUNT_MG"\",\""$UNVERIFIED_AMOUNT_MG"\",\""$PRICERANGE_5MG"\",\
+\""$PRICERANGE_1MG"\",\""$PRICERANGE_50MG"\",\""$IS_SC"\",\""$IS_BB"\",\""$COMPOUND_STATE"\"\
+,\""$QC_METHOD"\",\""$formula"\",\""$HBA1"\",\""$HBD"\",\""$InChIKey"\",\""$logP"\",\""$MW"\"\
+,\""$TPSA"\",\""$InChI"\",\""$SMILES"\"  >> ./meta/$thread_i.csv
+
 mv "${local[$i]}" ./sdf-2d/$PUBCHEM_EXT_DATASOURCE_REGID.sdf
 }
 
@@ -194,3 +201,6 @@ sane
 main
 wait
 
+#local=( ${sdf_files[@]} )
+#echo ${local[@]}
+#caser_wrap
