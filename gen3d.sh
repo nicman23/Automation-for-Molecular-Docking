@@ -34,12 +34,14 @@ i=0
 total=${#thread_files[@]}
 allthemfiles=()
 while [ "${thread_files[$i]}" ]
-  do echo "${thread_files[$i]}" >> ./babel-logs/babel-output-gen3d-$date-thread-$thread_i.log &
-  timeout 20s obabel -i sdf ./sdf-2d/"${thread_files[$i]}" --gen3d -o sdf\
-  -p 7.4 -O ./sdf-3d/$(basename "${thread_files[$i]}")\
-  &>> ./babel-logs/babel-output-gen3d-$date-thread-$thread_i.log || echo "${thread_files[$i]}" >> bad_sdfs
-  i=$(( i + 1 ))
+  do for file in ${thread_files[@]:$i:50}
+    do echo $file >> ./babel-logs/babel-output-gen3d-$date-thread-$thread_i.log &
+    timeout 20s obabel -i sdf ./sdf-2d/"$file" --gen3d -o sdf\
+    -p 7.4 -O ./sdf-3d/$(basename "$file")\
+    &>> ./babel-logs/babel-output-gen3d-$date-thread-$thread_i.log || echo "$file" >> bad_sdfs
+  done
   echo Thread $thread_i: $i /$total > /tmp/gen3dpipe$thread_i &
+  i=$(( i + 50 ))
 done
 echo Thread $thread_i exited > /tmp/gen3dpipe$thread_i
 }
