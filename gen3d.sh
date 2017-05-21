@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-main() {
+discover() {
 cd sdf-2d
 echo Finding 2d files
 allthemfiles=( $(find .) )
@@ -11,10 +11,15 @@ allthemdonefiles=( $(find .) )
 echo Found: ${#allthemdonefiles[@]}
 cd ..
 echo Removing already computed 3d files from array
-
 #this made me rethink life, our place in the universe and the upcoming singularity
 allthemfiles=($(echo ${allthemdonefiles[@]} ${allthemfiles[@]} | tr ' ' '\n' | sort | uniq -u))
 allthemdonefiles=()
+prefix='./sdf-2d/'
+}
+
+main() {
+[ -e "$1" ] && allthemfiles=( $(cat $1) )
+[ "$allthemfiles" ] || discover
 files=${#allthemfiles[@]}
 divdummy=$(( files / threads ))
 echo Converting sdf input files $files
@@ -36,7 +41,7 @@ allthemfiles=()
 while [ "${thread_files[$i]}" ]
   do for file in ${thread_files[@]:$i:50}
     do echo $file >> ./babel-logs/babel-output-gen3d-$date-thread-$thread_i.log &
-    timeout 20s obabel -i sdf ./sdf-2d/"$file" --gen3d -o sdf\
+    timeout 20s obabel -i sdf "$prefix""$file" --gen3d -o sdf\
     -p 7.4 -O ./sdf-3d/$(basename "$file")\
     &>> ./babel-logs/babel-output-gen3d-$date-thread-$thread_i.log || echo "$file" >> bad_sdfs
   done
@@ -59,4 +64,4 @@ date=$(date +%F)
 
 threads=$1
 sane
-main
+main $2
