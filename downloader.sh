@@ -31,7 +31,7 @@ for i in ${date[@]}
     if [ -e 'lmiis_removed.txt' ]
       then cd sdf-2d ; rm -rf $(cat ../lmiis_removed.txt)
       cd ../sdf-3d ; rm -rf $(cat ../lmiis_removed.txt)
-      # cd ..
+      cd ..
       rm lmiis_removed.txt
     fi
 done
