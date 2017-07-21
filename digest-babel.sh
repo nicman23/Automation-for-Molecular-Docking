@@ -130,9 +130,11 @@ rm ../thread_$1.smi
 
 caser_wrap() {
 i=0
-while [ ! -z "${local[$i]}" ]
-  do caser $(grep '^>' -A1 --no-group-separator ${local[$i]} | tr -d '<> ')
-  i=$(( i + 1 ))
+while [ "${local[$i]}" ]
+  do for file in ${local[@]:$i:50}
+    do caser $(grep '^>' -A1 --no-group-separator $file | tr -d '<> ')
+  done
+  i=$(( i + 50 ))
 done
 sleep 2s
 echo Thread $thread_i exited
@@ -165,15 +167,15 @@ while true; do
     * ) echo hi $1 ; shift 1;;
   esac
 done
-[ "$PUBCHEM_EXT_DATASOURCE_REGID" ] || local PUBCHEM_EXT_DATASOURCE_REGID=$(head -n1 ${local[$i]})
-local SMILES="$(obabel -i sdf ${local[$i]} -o smiles )"
+[ "$PUBCHEM_EXT_DATASOURCE_REGID" ] || local PUBCHEM_EXT_DATASOURCE_REGID=$(head -n1 $file)
+local SMILES="$(obabel -i sdf $file -o smiles )"
 echo \"\",\""$PUBCHEM_EXT_DATASOURCE_REGID"\",\""$PUBCHEM_EXT_SUBSTANCE_URL"\"\
 ,\""$VERIFIED_AMOUNT_MG"\",\""$UNVERIFIED_AMOUNT_MG"\",\""$PRICERANGE_5MG"\",\
 \""$PRICERANGE_1MG"\",\""$PRICERANGE_50MG"\",\""$IS_SC"\",\""$IS_BB"\",\""$COMPOUND_STATE"\"\
 ,\""$QC_METHOD"\",\""$formula"\",\""$HBA1"\",\""$HBD"\",\""$InChIKey"\",\""$logP"\",\""$MW"\"\
 ,\""$TPSA"\",\""$InChI"\",\""$SMILES"\"  >> ./meta/$thread_i.csv
 
-mv "${local[$i]}" ./sdf-2d/$PUBCHEM_EXT_DATASOURCE_REGID.sdf
+mv "$file" ./sdf-2d/$PUBCHEM_EXT_DATASOURCE_REGID.sdf
 }
 
 add_to_sql() {
