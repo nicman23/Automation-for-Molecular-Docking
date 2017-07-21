@@ -9,21 +9,32 @@ done
 }
 
 download_sdf() {
-date=( $(curl $url | grep '^d' | rev | cut -d ' ' -f1 | rev | grep -P '(?<!\d)\d{4}(?!\d)-(?<!\d)\d{2}(?!\d)' | tail -n1 ) )
+date=( $(curl $url | grep '^d' | rev | cut -d ' ' -f1 | rev | grep -P '(?<!\d)\d{4}(?!\d)-(?<!\d)\d{2}(?!\d)') )
 remove_done
-echo $date > temp
-exit
 if [ "$first_run" == '1' ]
-    then sdf=( $(curl $url$date/All\ Stock\ Compounds/ | grep '.sdf.gz'  | rev | cut -d ' ' -f1 | rev) )
-    else sdf=( $(curl $url$date/All\ Stock\ Compounds/Changed\ Since\ Previous\ Update/ | rev | cut -d ' ' -f1 | rev) )
-    addition='Changed Since Previous Update/'
+  then echo ${date[@]} | tr ' ' '\n'  > $done_txt
+  date=( $(echo ${date[@]} | rev | cut -d ' ' -f1 | rev) )
+
 fi
-for I in ${sdf[@]}
-  do curl -O "$url$date/All Stock Compounds/$addition$date"
-  echo ungziping
-  gunzip $I
+for i in ${date[@]}
+  do if [ ! "$first_run" == '1' ]
+    then addition='Changed Since Previous Update/'
+    echo $i | tr ' ' '\n' >> $done_txt
+  fi
+  sdf=( $(curl "$url$i/All Stock Compounds/$addition" | grep '.gz' | rev | cut -d ' ' -f1 | rev) )
+  for I in ${sdf[@]}
+    do curl "$url$i/All Stock Compounds/$addition/$I" -O
+    echo ungziping
+    gunzip $I
+  done
+    [ -e 'lmiis_added.sdf' ] && mv lmiis_added.sdf $i\_added.sdf
+    if [ -e 'lmiis_removed.txt' ]
+      then cd sdf-2d ; rm -rf $(cat ../lmiis_removed.txt)
+      cd ../sdf-3d ; rm -rf $(cat ../lmiis_removed.txt)
+      # cd ..
+      rm lmiis_removed.txt
+    fi
 done
-echo $date >> $done_txt
 }
 
 main() {
@@ -32,8 +43,7 @@ if [ -e $done_txt ]
   else first_run=1
 fi
 download_sdf
-echo Removing no longer available
-[ -e 'lmiis_removed.txt' ] && rm -rf $(echo ./sdf-2d/$(cat lmiis_removed.txt))
+echo Done
 }
 
 main
