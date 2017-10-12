@@ -31,7 +31,7 @@ ld_date=$(cat ~/.zinc15-dl-ld)
 date="$(date +%Y-%m-%d | tee ~/.zinc15-dl-ld)"
 curl 'http://zinc15.docking.org/tranches/download'\
  --data "representation=3D&tranches=$tranches
- &since=$ld_date&database_root=&format=db2.gz&using=wget"\
+ &since=$ld_date&database_root=&format=sdf.gz&using=wget"\
  --compressed | grep '^mkdir' > zinc15_$date.sh
 echo The links are in zinc15_$date.sh
 }
