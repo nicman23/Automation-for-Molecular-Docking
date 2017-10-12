@@ -79,7 +79,7 @@ last_line=1
 for i in ${count[@]}
   do echo Splitting File $1: $i/$threads times
   cat $@ | sed -n $last_line,$(( lines_avg + last_line ))p >> thread_$i.sdf
-  [ ! -z "$(grep -Pzo '\$\$\$\$\n\$\$\$\$' $thread_$i.sdf)" ] && sed '$d' -i $thread_$i.sdf
+  [ ! -z "$(grep -Pzo '\$\$\$\$\n\$\$\$\$' thread_$i.sdf)" ] && sed '$d' -i thread_$i.sdf
   last_line=$(( last_line + lines_avg ))
   if [ "$i" == '1' ]
     then cat $@ | tail -n +$(( last_line + 1 )) >> thread_1.sdf
@@ -130,11 +130,13 @@ rm ../thread_$1.smi
 
 caser_wrap() {
 i=0
+total="${#local[@]}"
 while [ "${local[$i]}" ]
   do for file in ${local[@]:$i:50}
     do caser $(grep '^>' -A1 --no-group-separator $file | tr -d '<> ')
   done
   i=$(( i + 50 ))
+  echo Thread $thread_i: $i /$total > /tmp/caser$thread_i &
 done
 sleep 2s
 echo Thread $thread_i exited
