@@ -3,10 +3,10 @@
 # το shebang και όλο το αρχείο μπορεί να τρέξει και σε bash και dash
 # η οποία είναι πιο γρήγορη αλλά δεν έχει τα ίδια features
 
-# Κάνει print το 28 `"' το οποίο είναι το όνομα του ενός από τα αρχεία
+# Κάνει print το 12 `"' το οποίο είναι το όνομα του ενός από τα αρχεία
 # που θα κατεβούν
 get_names() {
-cut -d \" -f 28
+cut -d \" -f 12
 }
 
 # Το IFS είναι ουσιαστικά που το for βλέπει για νέο string ie το
@@ -16,10 +16,10 @@ cut -d \" -f 28
 # που είσαγεται στο function. Τα 2 grep διαχωρίζουν τα αρχεία που θέλουμε
 # με τα παραπάνω κριτήρια.
 json_parser() {
-local IFS='}]['
+local IFS='{}'
 for i in $(cat -)
-  do echo $i |grep "\"reactive\": \"$reg_reactive\""|
-  grep "\"purchasable\": \"$reg_purchasable\"" | get_names
+  do echo $i | grep \"R\"\:\""$reg_reactive"\" |
+  grep \"P\":\""$reg_purchasable"\" | get_names
 done
 }
 
@@ -32,7 +32,8 @@ date="$(date +%Y-%m-%d | tee ~/.zinc15-dl-ld)"
 curl 'http://zinc15.docking.org/tranches/download'\
  --data "representation=3D&tranches=$tranches
  &since=$ld_date&database_root=&format=sdf.gz&using=wget"\
- --compressed | grep '^mkdir' > zinc15_$date.sh
+ --compressed | grep '^mkdir' | sed 's/wget/wget -c/g' \
+ > zinc15_$date.sh
 echo The links are in zinc15_$date.sh
 }
 
@@ -51,6 +52,8 @@ reg_purchasable='[A-B]'
 
 # Μερικό string manipulation με το ένα function να δίνει pipe στο άλλο
 # και τελικά να πάει στο tranches
-tranches="$(echo $(get_json | json_parser) | tr ' ' '+')"
+tranches="$(echo $(get_json | jq -c '.[] | { R: .reactive ,P: .purchasable ,N: .name }' | json_parser) | tr ' ' '+')"
+echo $tranches
+
 
 get_links

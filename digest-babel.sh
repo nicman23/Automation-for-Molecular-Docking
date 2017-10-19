@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 date=$(date +%F)
-threads=$(grep -c ^processor /proc/cpuinfo)
+#threads=$(grep -c ^processor /proc/cpuinfo)
 
 sane() {
 if [[ -z "${sdf_files[@]}" ]] && [[ -z "${smi_files[@]}" ]]
@@ -12,7 +12,7 @@ if [ "$threads" == '0' ]
   exit 3
   else count=($(eval echo {$threads..1}))
 fi
-for i in babel-output meta sdf-2d babel-logs
+for i in babel-output meta sdf-2d sdf-3d babel-logs
   do [ -e $i ] || mkdir $i
 done
 }
@@ -102,7 +102,8 @@ done
 
 babel_thread_sdf() {
 cd babel-output
-obabel ../thread_$1.sdf --add 'formula HBA1 HBD InChIKey logP MW TPSA InChI' -p 7.4 -m -o sdf $1_$date.sdf &> ../babel-logs/babel-output-$date-$1.log
+obabel ../thread_$1.sdf --add 'formula HBA1 HBD InChIKey logP MW TPSA InChI' \
+-p 7.4 -m -o sdf $1_$date.sdf &> ../babel-logs/babel-output-$date-$1.log
 echo Convertion of sdf files in thread $1 exited
 rm ../thread_$1.sdf
 }
@@ -123,7 +124,8 @@ done
 
 babel_thread_smi() {
 cd babel-output
-obabel ../thread_$1.smi --gen2d --add 'formula HBA1 HBD InChIKey logP MW TPSA' -p 7.4 -m -o sdf $1_$date.sdf &> ../babel-logs/babel-output-$date-$1.log
+obabel ../thread_$1.smi --gen2d --add 'formula HBA1 HBD InChIKey logP MW TPSA' \
+-p 7.4 -m -o sdf $1_$date.sdf &> ../babel-logs/babel-output-$date-$1.log
 echo Convertion of smi files in thread $1 exited
 rm ../thread_$1.smi
 }
@@ -169,15 +171,19 @@ while true; do
     * ) echo hi $1 ; shift 1;;
   esac
 done
-[ "$PUBCHEM_EXT_DATASOURCE_REGID" ] || local PUBCHEM_EXT_DATASOURCE_REGID=$(head -n1 $file)
-local SMILES="$(obabel -i sdf $file -o smiles )"
-echo \"\",\""$PUBCHEM_EXT_DATASOURCE_REGID"\",\""$PUBCHEM_EXT_SUBSTANCE_URL"\"\
-,\""$VERIFIED_AMOUNT_MG"\",\""$UNVERIFIED_AMOUNT_MG"\",\""$PRICERANGE_5MG"\",\
-\""$PRICERANGE_1MG"\",\""$PRICERANGE_50MG"\",\""$IS_SC"\",\""$IS_BB"\",\""$COMPOUND_STATE"\"\
-,\""$QC_METHOD"\",\""$formula"\",\""$HBA1"\",\""$HBD"\",\""$InChIKey"\",\""$logP"\",\""$MW"\"\
-,\""$TPSA"\",\""$InChI"\",\""$SMILES"\"  >> ./meta/$thread_i.csv
+[ "$PUBCHEM_EXT_DATASOURCE_REGID" ] || local \
+PUBCHEM_EXT_DATASOURCE_REGID=$(head -n1 $file)
 
-mv "$file" ./sdf-2d/$PUBCHEM_EXT_DATASOURCE_REGID.sdf
+local SMILES="$(obabel -i sdf $file -o smiles)"
+
+echo \""$PUBCHEM_EXT_DATASOURCE_REGID"\",\""$PUBCHEM_EXT_SUBSTANCE_URL"\",\
+\""$VERIFIED_AMOUNT_MG"\",\""$UNVERIFIED_AMOUNT_MG"\",\""$PRICERANGE_5MG"\",\
+\""$PRICERANGE_1MG"\",\""$PRICERANGE_50MG"\",\""$IS_SC"\",\""$IS_BB"\",\
+\""$COMPOUND_STATE"\",\""$QC_METHOD"\",\""$formula"\",\""$HBA1"\",\
+\""$HBD"\",\""$InChIKey"\",\""$logP"\",\""$MW"\"\,\""$TPSA"\",\""$InChI"\",\
+\""$SMILES"\",\"\"  >> ./meta/$thread_i.csv
+
+mv "$file" ./sdf-2d/$is_3d$PUBCHEM_EXT_DATASOURCE_REGID.sdf
 }
 
 add_to_sql() {
@@ -190,17 +196,35 @@ mysql -u nikosf -pa -e "use BABEL" -e "
 "
 }
 
+zinc_mode() {
+is_3d='../sdf-3d/'
+}
 
+get_opts() {
 while true; do
   case $1 in
     ''			) break ;;
     -T | --threads	) threads=$2 ; shift 2 ;;
-    *.sdf		) [ -e "$1" ] && sdf_files=( $1 ${sdf_files[@]} ) ; shift 1 ;;
-    *.smi		) [ -e "$1" ] && smi_files=( $1 ${smi_files[@]} ) ; shift 1 ;;
+    -Z | --zinc		) zinc_mode ; shift 1 ;;
+    *.sdf		) if [ -e "$1" ]
+                            then sdf_files=( $1 ${sdf_files[@]} )
+                            else echo file not found: $1
+                          fi ; shift 1 ;;
+    *.smi		) if [ -e "$1" ]
+                            then smi_files=( $1 ${smi_files[@]} )
+                            else echo file not found: $1
+                          fi ; shift 1 ;;
     *			) shift 1 ;;
   esac
 done
+}
 
+get_opts $@
+while read file_pipe
+  do get_opts $file_pipe
+done
+
+echo ${sdf_files[@]} $threads ;exit
 sane
 main
 wait
