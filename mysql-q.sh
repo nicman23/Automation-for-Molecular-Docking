@@ -1,13 +1,14 @@
 mysql_q() {
 mysql -pa -e "use BABEL" -e "
-select PUBCHEM_EXT_DATASOURCE_REGID
-from Molecules
+SELECT MolPort.PUBCHEM_EXT_DATASOURCE_REGID, Zinc.ID
+FROM MolPort
+LEFT JOIN Zinc ON Zinc.EXT_ID = MolPort.PUBCHEM_EXT_DATASOURCE_REGID
 $(cat -)
 ;
 "
 }
 
-if [ -z "$@" ]
+if [ -z "$@" ] 2> /dev/null
   then echo -h \| --help for help
   exit 2
 fi
@@ -41,6 +42,7 @@ while true
   esac
 done
 
+I='MolPort.'
 for i in HBA1 HBD LogP MW TPSA
   do line_start=AND
   [ $first ] || line_start=WHERE
@@ -49,11 +51,11 @@ for i in HBA1 HBD LogP MW TPSA
   min_i=min_$i
   if [ "${!max_i}" ]
     then if [ "${!min_i}" ]
-      then echo $line_start \`$i\` BETWEEN ${!min_i} AND ${!max_i}
-      else echo $line_start \`$i\` \< ${!max_i}
+      then echo $line_start $I\`$i\` BETWEEN ${!min_i} AND ${!max_i}
+      else echo $line_start $I\`$i\` \< ${!max_i}
     fi
     else if [ "${!min_i}" ]
-      then echo $line_start \`$i\` \> ${!min_i}
+      then echo $line_start $I\`$i\` \> ${!min_i}
     fi
   fi
 done | mysql_q
