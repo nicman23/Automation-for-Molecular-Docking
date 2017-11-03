@@ -148,8 +148,7 @@ caser() {
 while true; do
   case $1 in
     PUBCHEM_EXT_DATASOURCE_REGID ) local PUBCHEM_EXT_DATASOURCE_REGID="$2" ; shift 2 ;;
-    PUBCHEM_EXT_SUBSTANCE_URL ) local PUBCHEM_EXT_SUBSTANCE_URL="$2" ; shift 2 ;;
-    PUBCHEM_EXT_DATASOURCE_URL ) local PUBCHEM_EXT_DATASOURCE_URL="$2" ; shift 2 ;;
+    Molecule_ID ) local ="$(cut -d ':' <<< $2)" ; shift 2 ;;
     VERIFIED_AMOUNT_MG ) local VERIFIED_AMOUNT_MG="$2" ; shift 2 ;;
     UNVERIFIED_AMOUNT_MG ) local UNVERIFIED_AMOUNT_MG="$2" ; shift 2 ;;
     PRICERANGE_5MG ) local PRICERANGE_5MG="$2" ; shift 2 ;;
