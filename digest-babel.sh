@@ -2,6 +2,8 @@
 date=$(date +%F)
 #threads=$(grep -c ^processor /proc/cpuinfo)
 
+
+
 sane() {
 if [[ -z "${sdf_files[@]}" ]] && [[ -z "${smi_files[@]}" ]]
   then echo "No input file"
@@ -12,7 +14,7 @@ if [ "$threads" == '0' ]
   exit 3
   else count=($(eval echo {$threads..1}))
 fi
-for i in babel-output meta sdf-2d sdf-3d babel-logs
+for i in babel-output meta sdf-2d sdf-3d babel-logs csplit-output
   do [ -e $i ] || mkdir $i
 done
 }
@@ -27,85 +29,41 @@ wait
 }
 
 main_sdf() {
-thread_prepare_sdf
 for i in ${sdf_files[@]}
-  do split_file_sdf $i
-done
+  do cat $i
+done | split_file_sdf
+
 echo Converting sdf input files
-for i in ${count[@]}
-  do babel_thread_sdf $i &
-done
-wait
+find csplit-output -type f -printf '%f\n' |
+parallel -j $threads -I {} obabel -i sdf csplit-output/{} \
+--add 'formula HBA1 HBD InChIKey logP MW TPSA InChI' \
+-p 7.4 -m -o sdf -O babel-output/{} &> babel-logs/babel-output-$date-$1.log
+rm -rf csplit-output
 }
 
 main() {
 [[ "${smi_files[@]}" ]] && main_smi
 [[ "${sdf_files[@]}" ]] && main_sdf
 echo Second Stage: Getting Info on each file and moving them
-for thread_i in ${count[@]}
-  do local=( $(find ./babel-output/ -mindepth 1 -name "$thread_i\_*") )
-  caser_wrap &
-done
-echo Please Wait for the the threads to exit
-wait
-echo Last Stage: Adding mySQL entries
-for i in meta/*
-  do add_to_sql "$i"
-  rm "$i"
-done
-}
 
-thread_prepare_sdf() {
-files=${#sdf_files[@]}
-divdummy=$(( files / threads ))
-[ "$divdummy" == '0' ] && return 0
-i=0
-thread=1
-repeat=$(eval echo {1..$divdummy})
-while [ ! $thread -gt $threads ]
-  do for I in $repeat
-    do cat ${sdf_files[$i]} >> thread_$thread.sdf
-    unset sdf_files[$i]
-    i=$(( i + 1 ))
+find ./babel-output/ -type f |
+parallel -j $threads --pipe "$scipt_location" --caser
+exit
+echo Please Wait for the the threads to exit
+exit
+echo Last Stage: Adding mySQL entries
+for I in MolPort Ambinter
+  do for i in meta/${I:0:1}*
+    do echo add_to_sql "$i"
+    #rm "$i"
   done
-  thread=$((thread + 1))
 done
 }
 
 split_file_sdf() {
-lines=$(cat $@ | wc -l)
-lines_avg=$(( lines / threads ))
-last_line=1
-for i in ${count[@]}
-  do echo Splitting File $1: $i/$threads times
-  cat $@ | sed -n $last_line,$(( lines_avg + last_line ))p >> thread_$i.sdf
-  [ ! -z "$(grep -Pzo '\$\$\$\$\n\$\$\$\$' thread_$i.sdf)" ] && sed '$d' -i thread_$i.sdf
-  last_line=$(( last_line + lines_avg ))
-  if [ "$i" == '1' ]
-    then cat $@ | tail -n +$(( last_line + 1 )) >> thread_1.sdf
-    else reader_line=$(reader_sdf $@ $i)
-    last_line=$reader_line
-  fi
-done
-}
-
-reader_sdf() {
-cat $@ | tail -n +$last_line | while read line
-  do echo $line >> thread_$2.sdf
-  last_line=$(( last_line + 1 ))
-  if [ "$line" = '$$$$' ]
-    then echo $last_line
-    break
-  fi
-done
-}
-
-babel_thread_sdf() {
-cd babel-output
-obabel ../thread_$1.sdf --add 'formula HBA1 HBD InChIKey logP MW TPSA InChI' \
--p 7.4 -m -o sdf $1_$date.sdf &> ../babel-logs/babel-output-$date-$1.log
-echo Convertion of sdf files in thread $1 exited
-rm ../thread_$1.sdf
+(cd csplit-output
+csplit - /\$\$\$\$\/+1 '{*}' -z -b %02d.sdf
+)
 }
 
 split_file_smi() {
@@ -123,73 +81,76 @@ done
 }
 
 babel_thread_smi() {
-cd babel-output
+(cd babel-output
 obabel ../thread_$1.smi --gen2d --add 'formula HBA1 HBD InChIKey logP MW TPSA' \
--p 7.4 -m -o sdf $1_$date.sdf &> ../babel-logs/babel-output-$date-$1.log
+-p 7.4 -m -o sdf -O $1_$date.sdf &> ../babel-logs/babel-output-$date-$1.log
 echo Convertion of smi files in thread $1 exited
 rm ../thread_$1.smi
+)
 }
 
 caser_wrap() {
-i=0
-total="${#local[@]}"
-while [ "${local[$i]}" ]
-  do for file in ${local[@]:$i:50}
-    do caser $(grep '^>' -A1 --no-group-separator $file | tr -d '<> ')
-  done
-  i=$(( i + 50 ))
-  echo Thread $thread_i: $i /$total > /tmp/caser$thread_i &
+true=1
+false=0
+NP_like=',"'
+while read file
+  do grep '^>' -A1 --no-group-separator $file |
+  caser "$file"
 done
-sleep 2s
-echo Thread $thread_i exited
 }
 
 caser() {
-while true; do
-  case $1 in
-    PUBCHEM_EXT_DATASOURCE_REGID ) local PUBCHEM_EXT_DATASOURCE_REGID="$2" ; shift 2 ;;
-    Molecule_ID ) local ="$(cut -d ':' <<< $2)" ; shift 2 ;;
-    VERIFIED_AMOUNT_MG ) local VERIFIED_AMOUNT_MG="$2" ; shift 2 ;;
-    UNVERIFIED_AMOUNT_MG ) local UNVERIFIED_AMOUNT_MG="$2" ; shift 2 ;;
-    PRICERANGE_5MG ) local PRICERANGE_5MG="$2" ; shift 2 ;;
-    PRICERANGE_1MG ) local PRICERANGE_1MG="$2" ; shift 2 ;;
-    PRICERANGE_50MG ) local PRICERANGE_50MG="$2" ; shift 2 ;;
-    IS_SC ) local IS_SC="$2" ; shift 2 ;;
-    IS_BB ) local IS_BB="$2" ; shift 2 ;;
-    COMPOUND_STATE ) local COMPOUND_STATE="$2" ; shift 2 ;;
-    QC_METHOD ) local QC_METHOD="$2" ; shift 2 ;;
-    formula ) local formula="$2" ; shift 2 ;;
-    HBA1 ) local HBA1="$2" ; shift 2 ;;
-    HBD ) local HBD="$2" ; shift 2 ;;
-    InChIKey ) local InChIKey="$2" ; shift 2 ;;
-    logP ) local logP="$2" ; shift 2 ;;
-    MW ) local MW="$2" ; shift 2 ;;
-    TPSA ) local TPSA="$2" ; shift 2 ;;
-    InChI ) local InChI="$2" ; shift 2 ;;
+while read first ; read second
+  do case "$first" in
+    '>  <PUBCHEM_EXT_DATASOURCE_REGID>' ) local ID="$second" ; NP_like='' ; continue ;;
+    '>  <VERIFIED_AMOUNT_MG>' ) local VERIFIED_AMOUNT_MG="$second" ; continue ;;
+    '>  <UNVERIFIED_AMOUNT_MG>' ) local UNVERIFIED_AMOUNT_MG="$second" ; continue ;;
+    '>  <PRICERANGE_5MG>' ) local PRICERANGE_5MG="$second" ; continue ;;
+    '>  <PRICERANGE_1MG>' ) local PRICERANGE_1MG="$second" ; continue ;;
+    '>  <PRICERANGE_50MG>' ) local PRICERANGE_50MG="$second" ; continue ;;
+    '>  <IS_SC>' ) local IS_SC="$second" ; continue ;;
+    '>  <IS_BB>' ) local IS_BB="$second" ; continue ;;
+    '>  <COMPOUND_STATE>' ) local COMPOUND_STATE="$second" ; continue ;;
+    '>  <QC_METHOD>' ) local QC_METHOD="$second" ; continue ;;
+    '>  <formula>' ) local formula="$second" ; continue ;;
+    '>  <HBA1>' ) local HBA1="$second" ; continue ;;
+    '>  <HBD>' ) local HBD="$second" ; continue ;;
+    '>  <InChIKey>' ) local InChIKey="$second" ; continue ;;
+    '>  <logP>' ) local logP="$second" ; continue ;;
+    '>  <MW>' ) local MW="$second" ; continue ;;
+    '>  <TPSA>' ) local TPSA="$second" ; continue ;;
+    '>  <smiles>' ) local SMILES="$second" ; continue ;;
+    '>  <InChI>' ) local InChI="$(cut -d '	' -f 1 <<< $second)" ; continue ;;
+    '>  <lead_like>' ) eval local lead_like=\$$second ; continue ;;
+    '>  <drug_like>' ) eval local drug_like=\$$second ; continue ;;
+    '>  <PPI_like>' ) eval local PPI_like=\$$second ; continue ;;
+    '>  <fragment_like>' ) eval local fragment_like=\$$second ; continue ;;
+    '>  <ext_fragment_like>' ) eval local ext_fragment_like=\$$second ; continue ;;
+    '>  <kinase_like>' ) eval local kinase_like=\$$second ; continue ;;
+    '>  <GPCR_like>' ) eval local GPCR_like=\$$second ; continue ;;
+    '>  <NR_like>' )  eval local NR_like=\$$second ; continue ;;
+    '>  <NP_like>' ) eval local second=\$$second ; local NP_like="\",\"$second" ; continue ;;
+    '>  <is_3D>' ) local is_3d='../sdf-3d/' ; continue ;;
     '' ) break ;;
-    * ) echo hi $1 ; shift 1;;
+    * ) continue ;;
   esac
 done
-[ "$PUBCHEM_EXT_DATASOURCE_REGID" ] || local \
-PUBCHEM_EXT_DATASOURCE_REGID=$(head -n1 $file)
 
-local SMILES="$(obabel -i sdf $file -o smiles)"
+[ "$ID" ] || local \
+ID=$(head -n1 $1 | cut -d '_' -f1)
 
-echo \""$PUBCHEM_EXT_DATASOURCE_REGID"\",\""$PUBCHEM_EXT_SUBSTANCE_URL"\",\
-\""$VERIFIED_AMOUNT_MG"\",\""$UNVERIFIED_AMOUNT_MG"\",\""$PRICERANGE_5MG"\",\
-\""$PRICERANGE_1MG"\",\""$PRICERANGE_50MG"\",\""$IS_SC"\",\""$IS_BB"\",\
-\""$COMPOUND_STATE"\",\""$QC_METHOD"\",\""$formula"\",\""$HBA1"\",\
-\""$HBD"\",\""$InChIKey"\",\""$logP"\",\""$MW"\"\,\""$TPSA"\",\""$InChI"\",\
-\""$SMILES"\",\"\"  >> ./meta/$thread_i.csv
+[ "$SMILES" ] ||
+local SMILES="$(obabel -i sdf $1 -o smiles)"
 
-mv "$file" ./sdf-2d/$is_3d$PUBCHEM_EXT_DATASOURCE_REGID.sdf
+echo "\"$ID\",\"$VERIFIED_AMOUNT_MG$lead_like\",\"$UNVERIFIED_AMOUNT_MG$drug_like\",\"$PRICERANGE_5MG$PPI_like\",\"$PRICERANGE_1MG$PPI_like\",\"$PRICERANGE_50MG$fragment_like\",\"$IS_SC$ext_fragment_like\",\"$IS_BB$kinase_like\",\"$COMPOUND_STATE$GPCR_like\",\"$QC_METHOD$NR_like$NP_like\",\"$HBA1\",\"$HBD\",\"$logP\",\"$MW\",\"$TPSA\",\"$formula\",\"$SMILES\",\"$InChI\",\"$InChIKey\"" >> ./meta/${ID:0:1}$date.csv
+mv "$1" ./sdf-2d/$is_3d$ID.sdf
 }
 
 add_to_sql() {
-mysql -u nikosf -pa -e "use BABEL" -e "
+mysql -pa -e "use BABEL" -e "
       LOAD DATA LOCAL INFILE '$@'
-      INTO TABLE Molecules
-      FIELDS TERMINATED BY ','
+      INTO TABLE ${I}
+      FIELDS TERMINATED BY '\,'
       OPTIONALLY ENCLOSED BY '\"'
       LINES TERMINATED BY '\n' ;
 "
@@ -199,10 +160,11 @@ zinc_mode() {
 is_3d='../sdf-3d/'
 }
 
-get_opts() {
+scipt_location="$0"
 while true; do
   case $1 in
     ''			) break ;;
+    --caser		) cat - | caser_wrap ; exit ;;
     -T | --threads	) threads=$2 ; shift 2 ;;
     -Z | --zinc		) zinc_mode ; shift 1 ;;
     *.sdf		) if [ -e "$1" ]
@@ -216,18 +178,15 @@ while true; do
     *			) shift 1 ;;
   esac
 done
-}
 
-get_opts $@
-while read file_pipe
-  do get_opts $file_pipe
-done
+#while read file_pipe
+#  do get_opts $file_pipe
+#done
 
-echo ${sdf_files[@]} $threads ;exit
 sane
 main
-wait
 
-#local=( ${sdf_files[@]} )
-#echo ${local[@]}
-#caser_wrap
+#find ./sdf-2d -mindepth 1 -type f |
+#eval parallel -P $threads --pipe "$scipt_location" --caser
+
+#echo ${sdf_files[0]} | "$scipt_location" --caser
