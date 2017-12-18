@@ -1,21 +1,30 @@
 db_location='.'
 
-help_txt="--min-ΗΒΑ1  | -a
---min-HBD   | -d
---min-LogP  | -p
---min-MW    | -w
---min-TPSA  | -t
---max-ΗΒΑ1  | -A
---max-HBD   | -D
---max-LogP  | -P
---max-MW    | -W
---max-TPSA  | -T
+help_txt="--min-HBD
+--max-HBD
 
---db        | -b On which mysql DB to search (ie MolPort ; Ambinter). Case sensitive!"
+--min-MW
+--max-MW
+
+--min-TPSA
+--max-TPSA
+
+--min-LogP
+--max-LogP
+
+--mom-ΗΒΑ1
+--max-ΗΒΑ1
+
+
+--db
+
+--vina-threads
+--vina-log
+--vina-cfg"
 
 mysql_q() {
 if [ ! "$I" = 'Zinc' ]
-then
+  then
   mysql --user=nikosf -pa -e "use BABEL" -e "
   SELECT ${I}.ID, COALESCE(Zinc_ext.ID,'')
   FROM ${I}
@@ -23,7 +32,7 @@ then
   $(cat -)
   ;
   "
-else
+  else
   mysql --user=nikosf -pa -e "use BABEL" -e "
   SELECT ID
   FROM Zinc
@@ -77,28 +86,33 @@ done
 
 vina_wrapper() {
 if [ "$vina_cfg" ]
-then 
-  parallel vina -c $vina_cfg --ligand 
-else cat -
+  then parallel -j $threads -I{} vina -c $vina_cfg --ligand {} --log $vina_log
+  else cat -
 fi
 }
 
+vina_out='mysql-q-docking.pdbqt'
+vina_log='mysql-q-docking.log'
+
 while true
   do case $1 in
-    --min-ΗΒΑ1  | -a ) min_HBA1=$2 ; shift 2 ;;
-    --max-ΗΒΑ1  | -A ) max_HBA1=$2 ; shift 2 ;;
-    --min-HBD   | -d ) min_HBD=$2 ; shift 2 ;;
-    --max-HBD   | -D ) max_HBD=$2 ; shift 2 ;;
-    --min-LogP  | -p ) min_LogP=$2 ; shift 2 ;;
-    --max-LogP  | -P ) max_LogP=$2 ; shift 2 ;;
-    --min-MW    | -w ) min_MW=$2 ; shift 2 ;;
-    --max-MW    | -W ) max_MW=$2 ; shift 2 ;;
-    --min-TPSA  | -t ) min_TPSA=$2 ; shift 2 ;;
-    --max-TPSA  | -T ) max_TPSA=$2 ; shift 2 ;;
-    --help      | -h ) echo "$help_txt" ; exit 2 ;;
-    --db        | -b ) DB=$2 ; shift 2 ;;
-    ''               ) break ;;
-    *                ) echo error ; exit 1 ;;
+    --min-ΗΒΑ1     ) min_HBA1=$2 ; shift 2 ;;
+    --max-ΗΒΑ1     ) max_HBA1=$2 ; shift 2 ;;
+    --min-HBD      ) min_HBD=$2 ; shift 2 ;;
+    --max-HBD      ) max_HBD=$2 ; shift 2 ;;
+    --min-LogP     ) min_LogP=$2 ; shift 2 ;;
+    --max-LogP     ) max_LogP=$2 ; shift 2 ;;
+    --min-MW       ) min_MW=$2 ; shift 2 ;;
+    --max-MW       ) max_MW=$2 ; shift 2 ;;
+    --min-TPSA     ) min_TPSA=$2 ; shift 2 ;;
+    --max-TPSA     ) max_TPSA=$2 ; shift 2 ;;
+    --help         ) echo "$help_txt" ; exit 2 ;;
+    --db           ) DB=$2 ; shift 2 ;;
+    --vina-threads ) threads=$2 ; shift 2 ;;
+    --vina-log     ) vina_log=$2 ; shift 2 ;;
+    --vina-cfg     ) vina_cfg=$2 ; shift 2 ;;
+    ''             ) break ;;
+    *              ) echo error, what is: $1 ; exit 1 ;;
   esac
 done
 
