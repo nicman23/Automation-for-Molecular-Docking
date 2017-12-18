@@ -1,3 +1,5 @@
+db_location='.'
+
 help_txt="--min-ΗΒΑ1  | -a
 --min-HBD   | -d
 --min-LogP  | -p
@@ -12,13 +14,23 @@ help_txt="--min-ΗΒΑ1  | -a
 --db        | -b On which mysql DB to search (ie MolPort ; Ambinter). Case sensitive!"
 
 mysql_q() {
-mysql --user=nikosf -pa -e "use BABEL" -e "
-SELECT ${I}.ID, COALESCE(Zinc.ID,'')
-FROM MolPort
-LEFT JOIN Zinc ON Zinc.EXT_ID = ${I}.ID
-$(cat -)
-;
-"
+if [ ! "$I" = 'Zinc' ]
+then
+  mysql --user=nikosf -pa -e "use BABEL" -e "
+  SELECT ${I}.ID, COALESCE(Zinc_ext.ID,'')
+  FROM ${I}
+  LEFT JOIN Zinc_ext ON Zinc_ext.EXT_ID = ${I}.ID
+  $(cat -)
+  ;
+  "
+else
+  mysql --user=nikosf -pa -e "use BABEL" -e "
+  SELECT ID
+  FROM Zinc
+  $(cat -)
+  ;
+  " | xargs -I{} echo dummy {}
+fi
 }
 
 query_writer() {
@@ -45,9 +57,9 @@ done | mysql_q
 
 
 file_writer() {
-if [  $2 ]
-  then echo $2.sdf
-  else echo $1.sdf
+if [ $2 ]
+  then echo $db_location/pdbqt/$2.pdbqt
+  else echo $db_location/sdf-2d/$1.sdf
 fi
 }
 
@@ -61,6 +73,14 @@ IFS="$(echo -en '\t') "
 while read line
   do file_writer $(echo $line)
 done
+}
+
+vina_wrapper() {
+if [ "$vina_cfg" ]
+then 
+  parallel vina -c $vina_cfg --ligand 
+else cat -
+fi
 }
 
 while true
@@ -84,5 +104,4 @@ done
 
 IFS='
 '
-query_writer | tail -n +2 | file_writter_wrapper
-
+query_writer 2> /dev/null | tail -n +2 | file_writter_wrapper | vina_wrapper

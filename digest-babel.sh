@@ -1,8 +1,5 @@
 #! /usr/bin/env bash
 date=$(date +%F)
-#threads=$(grep -c ^processor /proc/cpuinfo)
-
-
 
 sane() {
 if [[ -z "${sdf_files[@]}" ]] && [[ -z "${smi_files[@]}" ]]
@@ -14,7 +11,7 @@ if [ "$threads" == '0' ]
   exit 3
   else count=($(eval echo {$threads..1}))
 fi
-for i in babel-output meta sdf-2d sdf-3d babel-logs csplit-output
+for i in babel-output meta sdf-2d sdf-3d babel-logs csplit-output pdbqt
   do [ -e $i ] || mkdir $i
 done
 }
@@ -31,7 +28,7 @@ wait
 main_sdf() {
 for i in ${sdf_files[@]}
   do cat $i
-done | split_file_sdf
+done | split_file_sdf | echo Found $(wc -l) molecules
 
 echo Converting sdf input files
 find csplit-output -type f -printf '%f\n' |
@@ -47,17 +44,16 @@ main() {
 echo Second Stage: Getting Info on each file and moving them
 
 find ./babel-output/ -type f |
-parallel -j $threads --pipe "$scipt_location" --caser
-exit
+parallel -j $threads --pipe caser_wrap
 echo Please Wait for the the threads to exit
-exit
 echo Last Stage: Adding mySQL entries
-for I in MolPort Ambinter
-  do for i in meta/${I:0:1}*
-    do echo add_to_sql "$i"
-    #rm "$i"
+for I in MolPort Ambinter Zinc
+do for i in meta/${I:0:1}*
+  do add_to_sql "$i"
+  #rm "$i"
   done
 done
+
 }
 
 split_file_sdf() {
@@ -98,6 +94,7 @@ while read file
   caser "$file"
 done
 }
+export -f caser_wrap
 
 caser() {
 while read first ; read second
@@ -129,7 +126,7 @@ while read first ; read second
     '>  <kinase_like>' ) eval local kinase_like=\$$second ; continue ;;
     '>  <GPCR_like>' ) eval local GPCR_like=\$$second ; continue ;;
     '>  <NR_like>' )  eval local NR_like=\$$second ; continue ;;
-    '>  <NP_like>' ) eval local second=\$$second ; local NP_like="\",\"$second" ; continue ;;
+    '>  <NP_like>' ) eval local NP_like=\$$second ; continue ;;
     '>  <is_3D>' ) local is_3d='../sdf-3d/' ; continue ;;
     '' ) break ;;
     * ) continue ;;
@@ -142,9 +139,17 @@ ID=$(head -n1 $1 | cut -d '_' -f1)
 [ "$SMILES" ] ||
 local SMILES="$(obabel -i sdf $1 -o smiles)"
 
-echo "\"$ID\",\"$VERIFIED_AMOUNT_MG$lead_like\",\"$UNVERIFIED_AMOUNT_MG$drug_like\",\"$PRICERANGE_5MG$PPI_like\",\"$PRICERANGE_1MG$PPI_like\",\"$PRICERANGE_50MG$fragment_like\",\"$IS_SC$ext_fragment_like\",\"$IS_BB$kinase_like\",\"$COMPOUND_STATE$GPCR_like\",\"$QC_METHOD$NR_like$NP_like\",\"$HBA1\",\"$HBD\",\"$logP\",\"$MW\",\"$TPSA\",\"$formula\",\"$SMILES\",\"$InChI\",\"$InChIKey\"" >> ./meta/${ID:0:1}$date.csv
-mv "$1" ./sdf-2d/$is_3d$ID.sdf
+if [ ! "${ID:0:1}" = 'Z' ]
+then
+  echo "\"$ID\",\"$VERIFIED_AMOUNT_MG$lead_like\",\"$UNVERIFIED_AMOUNT_MG$drug_like\",\"$PRICERANGE_5MG$PPI_like\",\"$PRICERANGE_1MG$fragment_like\",\"$PRICERANGE_50MG$ext_fragment_like\",\"$IS_SC$kinase_like\",\"$IS_BB$GPCR_like\",\"$COMPOUND_STATE$NR_like\",\"$QC_METHOD$NP_like\",\"$HBA1\",\"$HBD\",\"$logP\",\"$MW\",\"$TPSA\",\"$formula\",\"$SMILES\",\"$InChI\",\"$InChIKey\"" >> ./meta/${ID:0:1}.csv
+  mv "$1" ./sdf-2d/$ID.sdf
+else
+  mv "$1" ./sdf-3d/$ID.sdf
+  echo "\"$ID\",\"$HBA1\",\"$HBD\",\"$logP\",\"$MW\",\"$TPSA\",\"$formula\",\"$SMILES\",\"$InChI\",\"$InChIKey\"" >> ./meta/Z.csv
+  obabel ./sdf-3d/$ID.sdf -o pdbqt -O ./pdbqt/$ID.pdbqt &> babel-logs/babel-output-pdbqt-$date.log
+fi
 }
+export -f caser
 
 add_to_sql() {
 mysql -pa -e "use BABEL" -e "
@@ -156,17 +161,10 @@ mysql -pa -e "use BABEL" -e "
 "
 }
 
-zinc_mode() {
-is_3d='../sdf-3d/'
-}
-
-scipt_location="$0"
 while true; do
   case $1 in
     ''			) break ;;
-    --caser		) cat - | caser_wrap ; exit ;;
     -T | --threads	) threads=$2 ; shift 2 ;;
-    -Z | --zinc		) zinc_mode ; shift 1 ;;
     *.sdf		) if [ -e "$1" ]
                             then sdf_files=( $1 ${sdf_files[@]} )
                             else echo file not found: $1
@@ -179,14 +177,5 @@ while true; do
   esac
 done
 
-#while read file_pipe
-#  do get_opts $file_pipe
-#done
-
 sane
 main
-
-#find ./sdf-2d -mindepth 1 -type f |
-#eval parallel -P $threads --pipe "$scipt_location" --caser
-
-#echo ${sdf_files[0]} | "$scipt_location" --caser
