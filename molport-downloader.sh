@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 url="ftp://$@@www.molport.com/molport_database/"
-done_txt="$HOME/.cache/molport_downloader"
+done_txt="/home/common/babel/.molport_downloader"
 
 remove_done() {
 for i in ${already_done[@]}
@@ -23,7 +23,7 @@ for i in ${date[@]}
   fi
   sdf=( $(curl "$url$i/All Stock Compounds/$addition" | grep '.gz' | rev | cut -d ' ' -f1 | rev) )
   for I in ${sdf[@]}
-    do curl "$url$i/All Stock Compounds/$addition/$I" -O
+    do curl -C - --limit-rate 2M "$url$i/All Stock Compounds/$addition/$I" -O
     echo ungziping
     gunzip $I
   done
@@ -46,4 +46,5 @@ download_sdf
 echo Done
 }
 
+mkdir molport ; cd molport
 main

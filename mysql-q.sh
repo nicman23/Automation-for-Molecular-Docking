@@ -12,11 +12,13 @@ help_txt="--min-HBD
 --min-LogP
 --max-LogP
 
---mom-ΗΒΑ1
+--min-ΗΒΑ1
 --max-ΗΒΑ1
 
 
 --db
+
+--zinc-mode
 
 --vina-threads
 --vina-log
@@ -68,7 +70,9 @@ done | mysql_q
 file_writer() {
 if [ $2 ]
   then echo $db_location/pdbqt/$2.pdbqt
-  else echo $db_location/sdf-2d/$1.sdf
+  else if [ ! "$zinc_mode" ]
+    then echo $db_location/sdf-2d/$1.sdf
+  fi
 fi
 }
 
@@ -86,13 +90,13 @@ done
 
 vina_wrapper() {
 if [ "$vina_cfg" ]
-  then parallel -j $threads -I{} vina -c $vina_cfg --ligand {} --log $vina_log
+  then parallel -j $threads -I{} vina --cpu 1 --config $vina_cfg --ligand {} $vina_log $vina_rcp
   else cat -
 fi
 }
 
-vina_out='mysql-q-docking.pdbqt'
-vina_log='mysql-q-docking.log'
+#vina_out='mysql-q-docking.pdbqt'
+#vina_log='--log mysql-q-docking.log'
 
 while true
   do case $1 in
@@ -108,9 +112,11 @@ while true
     --max-TPSA     ) max_TPSA=$2 ; shift 2 ;;
     --help         ) echo "$help_txt" ; exit 2 ;;
     --db           ) DB=$2 ; shift 2 ;;
+    --zinc-mode    ) zinc_mode=1 ; shift 1 ;;
     --vina-threads ) threads=$2 ; shift 2 ;;
-    --vina-log     ) vina_log=$2 ; shift 2 ;;
+    --vina-log     ) vina_log="--log $2" ; shift 2 ;;
     --vina-cfg     ) vina_cfg=$2 ; shift 2 ;;
+    --vina-rcp     ) vina_rcp="--receptor $2" ; shift 2 ;;
     ''             ) break ;;
     *              ) echo error, what is: $1 ; exit 1 ;;
   esac
@@ -118,4 +124,5 @@ done
 
 IFS='
 '
-query_writer 2> /dev/null | tail -n +2 | file_writter_wrapper | vina_wrapper
+#query_writer | tail -n +2 | file_writter_wrapper | vina_wrapper
+find pdbqt -type f | head -n5 | vina_wrapper

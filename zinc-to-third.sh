@@ -1,12 +1,4 @@
-write_csv() {
-echo \"$1\",\"$2\" >> /tmp/zinc.csv
-}
-
-reader() {
-while read line
-  do write_csv $line
-done
-}
+#! /usr/bin/env bash
 
 add_to_mysql() {
 mysql -u nikosf -pa -e "use BABEL" -e "
@@ -18,9 +10,10 @@ mysql -u nikosf -pa -e "use BABEL" -e "
 "
 }
 
-info_file="$@"
 cat $@ |
-reader
+cut -d "	" -f -2 |
+sed -e "s/^/\"/;s/$/\"/;s/	/\",\"/" > /tmp/zinc.csv
 
-add_to_mysql Zinc /tmp/zinc.csv
+add_to_mysql Zinc_ext /tmp/zinc.csv
 rm /tmp/zinc.csv
+

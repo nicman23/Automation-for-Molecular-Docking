@@ -24,15 +24,15 @@ done
 }
 
 # Το τελικό payload (με curl) που στέλνουμε σε μορφή url στην zinc15 με
-# την τελευταία ημ/νια που αποθηκεύεται στο ~/.zinc15-dl-ld. To grep
+# την τελευταία ημ/νια που αποθηκεύεται στο /home/common/babel/.zinc15-dl-ld. To grep
 # υπάρχει για να αποφευχθεί η εγγραφή λανθασμένων δεδομένων στο τελίκο αρχείο
 get_links() {
-ld_date=$(cat ~/.zinc15-dl-ld)
-date="$(date +%Y-%m-%d | tee ~/.zinc15-dl-ld)"
+ld_date=$(cat /home/common/babel/.zinc15-dl-ld)
+date="$(date +%Y-%m-%d | tee /home/common/babel/.zinc15-dl-ld)"
 curl 'http://zinc15.docking.org/tranches/download'\
  --data "representation=3D&tranches=$tranches
  &since=$ld_date&database_root=&format=sdf.gz&using=wget"\
- --compressed | grep '^mkdir' | sed 's/wget/wget -c/g' \
+ --compressed | grep '^mkdir' | sed 's/wget/wget -c --limit-rate=2M/g' \
  > zinc15_$date.sh
 echo The links are in zinc15_$date.sh
 }
@@ -53,7 +53,7 @@ reg_purchasable='[A-B]'
 # Μερικό string manipulation με το ένα function να δίνει pipe στο άλλο
 # και τελικά να πάει στο tranches
 tranches="$(echo $(get_json | jq -c '.[] | { R: .reactive ,P: .purchasable ,N: .name }' | json_parser) | tr ' ' '+')"
-echo $tranches
 
-
+mkdir zinc ; cd zinc
 get_links
+[ "$@" == 'download' ] 2> /dev/null && bash ./zinc15_$date.sh

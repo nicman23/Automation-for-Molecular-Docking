@@ -161,16 +161,33 @@ mysql -pa -e "use BABEL" -e "
 "
 }
 
+while read -t 1 line
+  do case $line in
+    ''			) break ;;
+    *.sdf               ) if [ -e "$line" ]
+                            then sdf_files+=("$line")
+                            else echo file not found: $line
+                          fi ; shift 1 ;;
+    *.smi               ) if [ -e "$line" ]
+                            then smi_files+=("$line")
+                            else echo file not found: $line
+                          fi ; shift 1 ;;
+    *                   ) echo What is: $line ; shift 1 ;;
+  esac
+done
+
+line=''
+
 while true; do
   case $1 in
     ''			) break ;;
     -T | --threads	) threads=$2 ; shift 2 ;;
     *.sdf		) if [ -e "$1" ]
-                            then sdf_files=( $1 ${sdf_files[@]} )
+                            then sdf_files+=("$1")
                             else echo file not found: $1
                           fi ; shift 1 ;;
     *.smi		) if [ -e "$1" ]
-                            then smi_files=( $1 ${smi_files[@]} )
+                            then smi_files+=("$1")
                             else echo file not found: $1
                           fi ; shift 1 ;;
     *			) shift 1 ;;
