@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 date=$(date +%F)
-
+threads=20
 sane() {
 if [[ -z "${sdf_files[@]}" ]] && [[ -z "${smi_files[@]}" ]]
   then echo "No input file"

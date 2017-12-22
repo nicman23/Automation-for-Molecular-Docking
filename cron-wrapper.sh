@@ -21,4 +21,4 @@ zinc-to-third.sh molport.info.txt ambint.info.txt
 
 find Downloads-tmp/ -name '*.sdf' -type f | digest-babel.sh
 
-# rm -rf Downloads-tmp
+rm -rf Downloads-tmp
