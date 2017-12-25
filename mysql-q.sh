@@ -15,17 +15,18 @@ help_txt="--min-HBD
 --min-ΗΒΑ1
 --max-ΗΒΑ1
 
-
 --db
 
 --zinc-mode
-
 --vina-threads
 --vina-log
---vina-cfg"
+--vina-cfg
+--vina-rcp
+--vina-rlt
+"
 
 mysql_q() {
-if [ ! "$I" = 'Zinc' ]
+if [ ! "$I" = 'Zinc' ] && [ ! -z "$I" ]
   then
   mysql --user=nikosf -pa -e "use BABEL" -e "
   SELECT ${I}.ID, COALESCE(Zinc_ext.ID,'')
@@ -71,13 +72,13 @@ file_writer() {
 if [ $2 ]
   then echo $db_location/pdbqt/$2.pdbqt
   else if [ ! "$zinc_mode" ]
-    then echo $db_location/sdf-2d/$1.sdf
+    then echo $db_location/pdbqt/$1.sdf
   fi
 fi
 }
 
 if [ -z "$@" ] 2> /dev/null
-  then echo -h \| --help for help
+  then echo --help for help
   exit 2
 fi
 
@@ -90,13 +91,26 @@ done
 
 vina_wrapper() {
 if [ "$vina_cfg" ]
-  then parallel -j $threads -I{} vina --cpu 1 --config $vina_cfg --ligand {} $vina_log $vina_rcp
+  then out_dir=$(mktemp -d -p .)
+  parallel -j $threads -I{} vina --cpu 4 --config $vina_cfg --ligand {} $vina_log $vina_rcp --out $out_dir/{/}
+  score() {
+    mv $@ $(sed '2q;d' $@ | cut -d '-' -f 2 | cut -d ' ' -f1)_$@
+  }
+  export -f score
+  (
+  cd $out_dir
+  find . -type f -printf "%f\n" |
+  parallel -j $threads score {/}
+  find . -type f -printf "%f\n" |
+  head -n $results | tar zcfv ../vina-result_$(date +'%s').tar.gz\
+  --files-from -
+  )
+  rm -rf $out_dir
   else cat -
 fi
 }
 
-#vina_out='mysql-q-docking.pdbqt'
-#vina_log='--log mysql-q-docking.log'
+results=1000
 
 while true
   do case $1 in
@@ -113,10 +127,11 @@ while true
     --help         ) echo "$help_txt" ; exit 2 ;;
     --db           ) DB=$2 ; shift 2 ;;
     --zinc-mode    ) zinc_mode=1 ; shift 1 ;;
-    --vina-threads ) threads=$2 ; shift 2 ;;
+    --vina-threads ) threads=$((($2+3)/4)) ; shift 2 ;;
     --vina-log     ) vina_log="--log $2" ; shift 2 ;;
     --vina-cfg     ) vina_cfg=$2 ; shift 2 ;;
     --vina-rcp     ) vina_rcp="--receptor $2" ; shift 2 ;;
+    --vina-rlt     ) results="$2" ; shift 2 ;;
     ''             ) break ;;
     *              ) echo error, what is: $1 ; exit 1 ;;
   esac
@@ -124,5 +139,6 @@ done
 
 IFS='
 '
-#query_writer | tail -n +2 | file_writter_wrapper | vina_wrapper
-find pdbqt -type f | head -n5 | vina_wrapper
+query_writer | tail -n +2 | file_writter_wrapper | vina_wrapper
+
+#find pdbqt -type f | head -n5 | vina_wrapper #debug test

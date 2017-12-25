@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 date=$(date +%F)
-threads=20
+
 sane() {
 if [[ -z "${sdf_files[@]}" ]] && [[ -z "${smi_files[@]}" ]]
   then echo "No input file"
@@ -137,15 +137,18 @@ done
 ID=$(head -n1 $1 | cut -d '_' -f1)
 
 [ "$SMILES" ] ||
-local SMILES="$(obabel -i sdf $1 -o smiles)"
+local SMILES="$(obabel -i sdf $1 -o smiles 2> /dev/null)"
+
+local positive=$(awk -F"+" '{print NF-1}' <<< "$SMILES")
+local negative=$(awk -F"-" '{print NF-1}' <<< "$SMILES")
 
 if [ ! "${ID:0:1}" = 'Z' ]
 then
-  echo "\"$ID\",\"$VERIFIED_AMOUNT_MG$lead_like\",\"$UNVERIFIED_AMOUNT_MG$drug_like\",\"$PRICERANGE_5MG$PPI_like\",\"$PRICERANGE_1MG$fragment_like\",\"$PRICERANGE_50MG$ext_fragment_like\",\"$IS_SC$kinase_like\",\"$IS_BB$GPCR_like\",\"$COMPOUND_STATE$NR_like\",\"$QC_METHOD$NP_like\",\"$HBA1\",\"$HBD\",\"$logP\",\"$MW\",\"$TPSA\",\"$formula\",\"$SMILES\",\"$InChI\",\"$InChIKey\"" >> ./meta/${ID:0:1}.csv
+  echo "\"$ID\",\"$VERIFIED_AMOUNT_MG$lead_like\",\"$UNVERIFIED_AMOUNT_MG$drug_like\",\"$PRICERANGE_5MG$PPI_like\",\"$PRICERANGE_1MG$fragment_like\",\"$PRICERANGE_50MG$ext_fragment_like\",\"$IS_SC$kinase_like\",\"$IS_BB$GPCR_like\",\"$COMPOUND_STATE$NR_like\",\"$QC_METHOD$NP_like\",\"$HBA1\",\"$HBD\",\"$logP\",\"$MW\",\"$TPSA\",\"$formula\",\"$SMILES\",\"$positive\",\"$negative\",\"$InChI\",\"$InChIKey\"" >> ./meta/${ID:0:1}.csv
   mv "$1" ./sdf-2d/$ID.sdf
 else
   mv "$1" ./sdf-3d/$ID.sdf
-  echo "\"$ID\",\"$HBA1\",\"$HBD\",\"$logP\",\"$MW\",\"$TPSA\",\"$formula\",\"$SMILES\",\"$InChI\",\"$InChIKey\"" >> ./meta/Z.csv
+  echo "\"$ID\",\"$HBA1\",\"$HBD\",\"$logP\",\"$MW\",\"$TPSA\",\"$formula\",\"$SMILES\",\"$positive\",\"$negative\",\"$InChI\",\"$InChIKey\"" >> ./meta/Z.csv
   obabel ./sdf-3d/$ID.sdf -o pdbqt -O ./pdbqt/$ID.pdbqt &> babel-logs/babel-output-pdbqt-$date.log
 fi
 }
