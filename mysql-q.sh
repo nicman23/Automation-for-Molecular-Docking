@@ -15,6 +15,12 @@ help_txt="--min-HBD
 --min-ΗΒΑ1
 --max-ΗΒΑ1
 
+--min-Pstv
+--max-Pstv
+
+--min-Ngtv
+--max-Ngtv
+
 --db
 
 --zinc-mode
@@ -47,7 +53,7 @@ fi
 
 query_writer() {
 I=$DB
-for i in HBA1 HBD LogP MW TPSA
+for i in HBA1 HBD LogP MW TPSA Pstv Ngtv
   do line_start=WHERE
   [ "$first" ] && line_start=AND
   max_i=max_$i
@@ -124,6 +130,10 @@ while true
     --max-MW       ) max_MW=$2 ; shift 2 ;;
     --min-TPSA     ) min_TPSA=$2 ; shift 2 ;;
     --max-TPSA     ) max_TPSA=$2 ; shift 2 ;;
+    --min-Pstv     ) min_Pstv=$2 ; shift 2 ;;
+    --max-Pstv     ) max_Pstv=$2 ; shift 2 ;;
+    --min-Ngtv     ) min_Ngtv=$2 ; shift 2 ;;
+    --max-Ngtv     ) max_Ngtv=$2 ; shift 2 ;;
     --help         ) echo "$help_txt" ; exit 2 ;;
     --db           ) DB=$2 ; shift 2 ;;
     --zinc-mode    ) zinc_mode=1 ; shift 1 ;;
