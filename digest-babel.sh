@@ -32,7 +32,7 @@ done | split_file_sdf | echo Found $(wc -l) molecules
 
 echo Converting sdf input files
 find csplit-output -type f -printf '%f\n' |
-parallel -j $threads -I {} obabel -i sdf csplit-output/{} \
+parallel --bar -j $threads -I {} obabel -i sdf csplit-output/{} \
 --add 'formula HBA1 HBD InChIKey logP MW TPSA InChI' \
 -p 7.4 -m -o sdf -O babel-output/{} &> babel-logs/babel-output-$date-$1.log
 rm -rf csplit-output
@@ -44,7 +44,7 @@ main() {
 echo Second Stage: Getting Info on each file and moving them
 
 find ./babel-output/ -type f |
-parallel -j $threads --pipe caser_wrap
+parallel --bar -j $threads --pipe caser_wrap
 echo Please Wait for the the threads to exit
 echo Last Stage: Adding mySQL entries
 for I in MolPort Ambinter Zinc
