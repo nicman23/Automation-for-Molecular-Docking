@@ -41,15 +41,15 @@ rm -rf csplit-output
 main() {
 [[ "${smi_files[@]}" ]] && main_smi
 [[ "${sdf_files[@]}" ]] && main_sdf
-echo Second Stage: Getting Info on each file and moving them
 
+echo Second Stage: Getting Info on each file and moving them
 find ./babel-output/ -type f |
-parallel --bar -j $threads --pipe caser_wrap
+parallel --bar -j $threads caser_wrap {}
 echo Please Wait for the the threads to exit
 echo Last Stage: Adding mySQL entries
 for I in MolPort Ambinter Zinc
 do for i in meta/${I:0:1}*
-  do add_to_sql "$i"
+  do add_to_sql "$i" &> /dev/null
   #rm "$i"
   done
 done
@@ -86,13 +86,8 @@ rm ../thread_$1.smi
 }
 
 caser_wrap() {
-true=1
-false=0
-NP_like=',"'
-while read file
-  do grep '^>' -A1 --no-group-separator $file |
-  caser "$file"
-done
+grep '^>' -A1 --no-group-separator $@ |
+caser "$@"
 }
 export -f caser_wrap
 
@@ -164,6 +159,22 @@ mysql -pa -e "use BABEL" -e "
 "
 }
 
+while true
+  do case $1 in
+    -T | --threads	) threads=$2 ; shift 2 ;;
+    *.sdf		) if [ -e "$1" ]
+                            then sdf_files+=("$1")
+                            else echo file not found: $1
+                          fi ; shift 1 ;;
+    *.smi		) if [ -e "$1" ]
+                            then smi_files+=("$1")
+                            else echo file not found: $1
+                          fi ; shift 1 ;;
+    ''			) break ;;
+    *			) shift 1 ;;
+  esac
+done
+
 while read -t 1 line
   do case $line in
     ''			) break ;;
@@ -180,22 +191,8 @@ while read -t 1 line
 done
 
 line=''
-
-while true; do
-  case $1 in
-    ''			) break ;;
-    -T | --threads	) threads=$2 ; shift 2 ;;
-    *.sdf		) if [ -e "$1" ]
-                            then sdf_files+=("$1")
-                            else echo file not found: $1
-                          fi ; shift 1 ;;
-    *.smi		) if [ -e "$1" ]
-                            then smi_files+=("$1")
-                            else echo file not found: $1
-                          fi ; shift 1 ;;
-    *			) shift 1 ;;
-  esac
-done
+true=1
+false=0
 
 sane
 main
