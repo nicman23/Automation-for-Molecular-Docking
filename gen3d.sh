@@ -1,14 +1,14 @@
 #! /usr/bin/env bash
 
 discover() {
-find sdf-3d sdf-2d -type f -printf "%f\n" |
+find sdf-2d pdbqt -type f ! -name 'Z*' -printf "%f\n" |
 sort --parallel=$threads | uniq -u > to_convert
 }
 
 main() {
 [ -e "$1" ] && allthemfiles=( $(cat $1) )
 [ "$allthemfiles" ] || discover
-parallel -j $threads --bar -I{} babel_thread {.} :::: to_convert
+parallel -j $threads babel_thread {.} :::: to_convert
 }
 
 babel_thread() {
@@ -23,14 +23,16 @@ export -f babel_thread
 
 sane() {
 [ -e sdf-2d ] || exit 2
-for i in sdf-3d babel-logs
+for i in sdf-3d babel-logs pdbqt
   do [ -e $i ] || mkdir $i
 done
 [ "$threads" -eq "$threads" ] &> /dev/null ||
-echo Please specify a correct thread count
-echo example $(basename $0) 10 for 10 threads
+echo 'Please specify a correct thread count
+'example $(basename $0) 10 for 10 threads
 }
 
 threads=$1
+export threads
+
 sane
 main $2

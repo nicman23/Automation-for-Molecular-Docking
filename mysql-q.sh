@@ -1,4 +1,5 @@
-db_location='.'
+#! /usr/bin/bash
+db_location='/home/common/babel'
 
 help_txt="--min-HBD
 --max-HBD
@@ -32,28 +33,19 @@ help_txt="--min-HBD
 "
 
 mysql_q() {
-if [ ! "$I" = 'Zinc' ] && [ ! -z "$I" ]
-  then
-  mysql --user=nikosf -pa -e "use BABEL" -e "
-  SELECT ${I}.ID, COALESCE(Zinc_ext.ID,'')
-  FROM ${I}
-  LEFT JOIN Zinc_ext ON Zinc_ext.EXT_ID = ${I}.ID
+mysql --login-path=local -N -e "use BABEL" -e "
+  SELECT IF(Zinc_ext.ID IS NULL,${DB}.ID,Zinc_ext.ID)
+  FROM ${DB}
+  LEFT JOIN Zinc_ext ON Zinc_ext.EXT_ID = ${DB}.ID
   $(cat -)
-  ;
-  "
-  else
-  mysql --user=nikosf -pa -e "use BABEL" -e "
-  SELECT ID
-  FROM Zinc
-  $(cat -)
-  ;
-  " | xargs -I{} echo dummy {}
-fi
+;
+"
 }
+
 
 query_writer() {
 I=$DB
-for i in HBA1 HBD LogP MW TPSA Pstv Ngtv
+for i in HBA1 HBD LogP MW TPSA Positive Negative
   do line_start=WHERE
   [ "$first" ] && line_start=AND
   max_i=max_$i
@@ -70,35 +62,18 @@ for i in HBA1 HBD LogP MW TPSA Pstv Ngtv
       first=0
     fi
   fi
-done | mysql_q
-}
-
-
-file_writer() {
-if [ $2 ]
-  then echo $db_location/pdbqt/$2.pdbqt
-  else if [ ! "$zinc_mode" ]
-    then echo $db_location/pdbqt/$1.sdf
-  fi
-fi
-}
-
-if [ -z "$@" ] 2> /dev/null
-  then echo --help for help
-  exit 2
-fi
-
-file_writter_wrapper() {
-IFS="$(echo -en '\t') "
-while read line
-  do file_writer $(echo $line)
 done
 }
 
 vina_wrapper() {
 if [ "$vina_cfg" ]
   then out_dir=$(mktemp -d -p .)
-  parallel -j $threads -I{} vina --cpu 4 --config $vina_cfg --ligand {} $vina_log $vina_rcp --out $out_dir/{/}
+  vina_fun() {
+    vina --cpu 4 --config $vina_cfg --ligand "$1" $vina_rcp --out $out_dir/"$2" &> /dev/null
+  }
+  export vina_cfg vina_log vina_rcp out_dir
+  export -f vina_fun
+  parallel --eta --progress -j $threads vina_fun $db_location/pdbqt/{}.pdbqt {/}.pdbqt
   score() {
     mv $@ $(sed '2q;d' $@ | cut -d '-' -f 2 | cut -d ' ' -f1)_$@
   }
@@ -106,7 +81,7 @@ if [ "$vina_cfg" ]
   (
   cd $out_dir
   find . -type f -printf "%f\n" |
-  parallel -j $threads score {/}
+  parallel --progress -j $threads score {/}
   find . -type f -printf "%f\n" |
   head -n $results | tar zcfv ../vina-result_$(date +'%s').tar.gz\
   --files-from -
@@ -117,6 +92,11 @@ fi
 }
 
 results=1000
+
+if [ -z "$@" ] 2> /dev/null
+  then echo --help for help
+  exit 2
+fi
 
 while true
   do case $1 in
@@ -138,7 +118,6 @@ while true
     --db           ) DB=$2 ; shift 2 ;;
     --zinc-mode    ) zinc_mode=1 ; shift 1 ;;
     --vina-threads ) threads=$((($2+3)/4)) ; shift 2 ;;
-    --vina-log     ) vina_log="--log $2" ; shift 2 ;;
     --vina-cfg     ) vina_cfg=$2 ; shift 2 ;;
     --vina-rcp     ) vina_rcp="--receptor $2" ; shift 2 ;;
     --vina-rlt     ) results="$2" ; shift 2 ;;
@@ -147,8 +126,4 @@ while true
   esac
 done
 
-IFS='
-'
-query_writer | tail -n +2 | file_writter_wrapper | vina_wrapper
-
-#find pdbqt -type f | head -n5 | vina_wrapper #debug test
+query_writer | mysql_q | vina_wrapper

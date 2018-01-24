@@ -26,13 +26,12 @@ wait
 }
 
 main_sdf() {
-for i in ${sdf_files[@]}
-  do cat $i
-done | split_file_sdf | echo Found $(wc -l) molecules
+echo Splitting ${#sdf_files[@]} sdf files
+split_file_sdf
 
 echo Converting sdf input files
 find csplit-output -type f -printf '%f\n' |
-parallel --bar -j $threads -I {} obabel -i sdf csplit-output/{} \
+parallel -j $threads -I {} obabel -i sdf csplit-output/{} \
 --add 'formula HBA1 HBD InChIKey logP MW TPSA InChI' \
 -p 7.4 -m -o sdf -O babel-output/{} &> babel-logs/babel-output-$date-$1.log
 rm -rf csplit-output
@@ -44,23 +43,30 @@ main() {
 
 echo Second Stage: Getting Info on each file and moving them
 find ./babel-output/ -type f |
-parallel --bar -j $threads caser_wrap {}
-echo Please Wait for the the threads to exit
+parallel -j $threads caser_wrap {}
+
 echo Last Stage: Adding mySQL entries
 for I in MolPort Ambinter Zinc
 do for i in meta/${I:0:1}*
   do add_to_sql "$i" &> /dev/null
-  #rm "$i"
+  rm "$i"
   done
 done
-
 }
 
-split_file_sdf() {
-(cd csplit-output
-csplit - /\$\$\$\$\/+1 '{*}' -z -b %02d.sdf
+cspit_sdf() {
+csplit $1 /\$\$\$\$\/+1 '{*}' -z -b %02d$2
+}
+export -f cspit_sdf
+
+split_file_sdf() (
+cd csplit-output
+for i in ${sdf_files[@]}
+  do echo ../$i
+done |
+parallel --bar -j 4 cspit_sdf {} {/} |
+echo Found $(wc -l) molecules
 )
-}
 
 split_file_smi() {
 lines=$(cat $@ | wc -l)
@@ -94,7 +100,7 @@ export -f caser_wrap
 caser() {
 while read first ; read second
   do case "$first" in
-    '>  <PUBCHEM_EXT_DATASOURCE_REGID>' ) local ID="$second" ; NP_like='' ; continue ;;
+    '>  <PUBCHEM_EXT_DATASOURCE_REGID>' ) local ID="$second" ; continue ;;
     '>  <VERIFIED_AMOUNT_MG>' ) local VERIFIED_AMOUNT_MG="$second" ; continue ;;
     '>  <UNVERIFIED_AMOUNT_MG>' ) local UNVERIFIED_AMOUNT_MG="$second" ; continue ;;
     '>  <PRICERANGE_5MG>' ) local PRICERANGE_5MG="$second" ; continue ;;
