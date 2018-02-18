@@ -120,10 +120,10 @@ while true
     --max-MW       ) max_MW=$2 ; shift 2 ;;
     --min-TPSA     ) min_TPSA=$2 ; shift 2 ;;
     --max-TPSA     ) max_TPSA=$2 ; shift 2 ;;
-    --min-Pstv     ) min_Pstv=$2 ; shift 2 ;;
-    --max-Pstv     ) max_Pstv=$2 ; shift 2 ;;
-    --min-Ngtv     ) min_Ngtv=$2 ; shift 2 ;;
-    --max-Ngtv     ) max_Ngtv=$2 ; shift 2 ;;
+    --min-Pstv     ) min_Positive=$2 ; shift 2 ;;
+    --max-Pstv     ) max_Positive=$2 ; shift 2 ;;
+    --min-Ngtv     ) min_Negative=$2 ; shift 2 ;;
+    --max-Ngtv     ) max_Negative=$2 ; shift 2 ;;
     --help         ) echo "$help_txt" ; exit 2 ;;
     --db           ) DB+=($2) ; shift 2 ;;
     --zinc-mode    ) zinc_mode=1 ; shift 1 ;;
