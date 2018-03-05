@@ -62,21 +62,22 @@ for i in HBA1 HBD LogP MW TPSA Positive Negative
     then if [ "${!min_i}" ]
       then echo $line_start $I.\`$i\` BETWEEN ${!min_i} AND ${!max_i}
       first=0
-      else echo $line_start $I.\`$i\` \< ${!max_i}
+    else echo $line_start $I.\`$i\` \<\= ${!max_i}
       first=0
     fi
     else if [ "${!min_i}" ]
-      then echo $line_start $I.\`$i\` \> ${!min_i}
+      then echo $line_start $I.\`$i\` \>\= ${!min_i}
       first=0
     fi
   fi
 done
+echo $line_start $I.\`Halo\` $halo
 }
 
 vina_wrapper() {
 out_dir=$(mktemp -d -p .)
 vina_fun() {
-vina --cpu 4 --config $vina_cfg --ligand "$1" $vina_rcp --out $out_dir/"$2" &> /dev/null
+$vinabin --cpu 4 --config $vina_cfg --ligand "$1" $vina_rcp --out $out_dir/"$2" &> /dev/null
 }
 export vina_cfg vina_log vina_rcp out_dir
 export -f vina_fun
@@ -92,7 +93,7 @@ echo Renaming results per score:
 find . -type f -printf "%f\n" |
 parallel --progress -j $threads score {/}
 echo Tarring $results best results.
-find . -type f -printf "%f\n" | sort -h | 
+find . -type f -printf "%f\n" | sort -h |
 tail -n $results | tar zcfv ../vina-result_$(date +'%s').tar.gz \
 --files-from -
 )
@@ -108,38 +109,44 @@ if [ -z "$@" ] 2> /dev/null
   exit 2
 fi
 
-while true
-  do case $1 in
-    --min-ΗΒΑ1     ) min_HBA1=$2 ; shift 2 ;;
-    --max-ΗΒΑ1     ) max_HBA1=$2 ; shift 2 ;;
-    --min-HBD      ) min_HBD=$2 ; shift 2 ;;
-    --max-HBD      ) max_HBD=$2 ; shift 2 ;;
-    --min-LogP     ) min_LogP=$2 ; shift 2 ;;
-    --max-LogP     ) max_LogP=$2 ; shift 2 ;;
-    --min-MW       ) min_MW=$2 ; shift 2 ;;
-    --max-MW       ) max_MW=$2 ; shift 2 ;;
-    --min-TPSA     ) min_TPSA=$2 ; shift 2 ;;
-    --max-TPSA     ) max_TPSA=$2 ; shift 2 ;;
-    --min-Pstv     ) min_Positive=$2 ; shift 2 ;;
-    --max-Pstv     ) max_Positive=$2 ; shift 2 ;;
-    --min-Ngtv     ) min_Negative=$2 ; shift 2 ;;
-    --max-Ngtv     ) max_Negative=$2 ; shift 2 ;;
-    --help         ) echo "$help_txt" ; exit 2 ;;
-    --db           ) DB+=($2) ; shift 2 ;;
-    --zinc-mode    ) zinc_mode=1 ; shift 1 ;;
-    --vina-threads ) threads=$((($2+3)/4)) ; shift 2 ;;
-    --vina-cfg     ) vina_cfg=$2 ; shift 2 ;;
-    --vina-rcp     ) vina_rcp="--receptor $2" ; shift 2 ;;
-    --vina-rlt     ) results="$2" ; shift 2 ;;
-    ''             ) break ;;
-    *              ) echo error, what is: $1 ; exit 1 ;;
-  esac
-done
+creategetargs() {
+echo 'function getargs() {'
+  echo '  while true
+    do case $1 in'
+  for i in $@
+    do for I in min max
+      do echo -e '      '--$I-$i'  \t'\) $I\_$i=\$2 ';' shift 2 ';;'
+    done
+  done
+  echo '      --help            ) echo "$help_txt" ; exit 2 ;;
+      --db              ) DB+=($2) ; shift 2 ;;
+      --zinc-mode       ) zinc_mode=1 ; shift 1 ;;
+      --vina-threads    ) threads=$((($2+3)/4)) ; shift 2 ;;
+      --vina-cfg        ) vina_cfg=$2 ; shift 2 ;;
+      --vina-rcp        ) vina_rcp="--receptor $2" ; shift 2 ;;
+      --vina-rlt        ) results="$2" ; shift 2 ;;
+      '\'\''                ) break ;;
+      *                 ) echo error, what is: $1 ; exit 1 ;;
+    esac
+  done'
+echo '}'
+}
+
+array_opt=( Pstv Ngtv abonds atoms bonds cansmi cansmiNS dbonds formula HBA1
+ HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds TPSA )
+
+eval "$(creategetargs ${array_opt[@]})"
+getargs $@
 
 db_loop() {
 for I in ${DB[@]}
-  do query_writer | mysql_q
-done
+  do halo='= 0'
+  query_writer | mysql_q
+done > results
+for I in ${DB[@]}
+  do halo='<> 0'
+  query_writer | mysql_q
+done > haloresults
 }
 
 if [ "$vina_cfg" ]
@@ -147,15 +154,18 @@ then if [ -e "./results" ]
   then read -p "./results found, do you want to use it?" -n 1 -r
     if [[ $REPLY =~ ^[Nn]$ ]]
       then echo 'Searching - this could take a lot of time (see mysql threads)'
-      db_loop > results
+      db_loop
     fi
 else
   echo 'Searching - this could take a lot of time (see mysql threads)'
-  db_loop > results
+  db_loop
   fi
   echo
+  vinabin='vina'
   cat results | vina_wrapper
+  vinabin='vinaSH'
+  cat haloresults | vina_wrapper
 else
   echo 'Searching - this could take a lot of time (see mysql threads)'
-  db_loop > results
+  db_loop
 fi

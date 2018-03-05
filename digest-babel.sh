@@ -31,8 +31,8 @@ split_file_sdf
 
 echo Converting sdf input files
 find csplit-output -type f -printf '%f\n' |
-parallel -j $threads -I {} obabel -i sdf csplit-output/{} \
---add 'formula HBA1 HBD InChIKey logP MW TPSA InChI' \
+parallel -j $threads -I {} obabel -i sdf csplit-output/{} -r \
+--add 'abonds atoms bonds cansmi cansmiNS dbonds formula HBA1 HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds title TPSA' \
 -p 7.4 -m -o sdf -O babel-output/{} &> babel-logs/babel-output-$date-$1.log
 rm -rf csplit-output
 }
@@ -110,29 +110,41 @@ while read first ; read second
     '>  <IS_BB>' ) local IS_BB="$second" ; continue ;;
     '>  <COMPOUND_STATE>' ) local COMPOUND_STATE="$second" ; continue ;;
     '>  <QC_METHOD>' ) local QC_METHOD="$second" ; continue ;;
+    '>  <smiles>' ) local SMILES="$second" ; continue ;;
+    '>  <lead_like>' ) local lead_like="${!second}"  ; continue ;;
+    '>  <drug_like>' ) local drug_like="${!second}"  ; continue ;;
+    '>  <PPI_like>' ) local PPI_like="${!second}"  ; continue ;;
+    '>  <fragment_like>' ) local fragment_like="${!second}"  ; continue ;;
+    '>  <ext_fragment_like>' ) local ext_fragment_like="${!second}"  ; continue ;;
+    '>  <kinase_like>' ) local kinase_like="${!second}"  ; continue ;;
+    '>  <GPCR_like>' ) local GPCR_like="${!second}"  ; continue ;;
+    '>  <NR_like>' )  local NR_like="${!second}"  ; continue ;;
+    '>  <NP_like>' ) local NP_like="${!second}"  ; continue ;;
+    '>  <is_3D>' ) local is_3d='../sdf-3d/' ; continue ;;
+    '>  <abonds>' ) local abonds="$second" ; continue ;;
+    '>  <atoms>' ) local atoms="$second" ; continue ;;
+    '>  <bonds>' ) local bonds="$second" ; continue ;;
+    '>  <cansmi>' ) local cansmi="$second" ; continue ;;
+    '>  <cansmiNS>' ) local cansmiNS="$second" ; continue ;;
+    '>  <dbonds>' ) local dbonds="$second" ; continue ;;
     '>  <formula>' ) local formula="$second" ; continue ;;
     '>  <HBA1>' ) local HBA1="$second" ; continue ;;
+    '>  <HBA2>' ) local HBA2="$second" ; continue ;;
     '>  <HBD>' ) local HBD="$second" ; continue ;;
+    '>  <InChI>' ) local InChI="$second" ; continue ;;
     '>  <InChIKey>' ) local InChIKey="$second" ; continue ;;
     '>  <logP>' ) local logP="$second" ; continue ;;
+    '>  <MP>' ) local MP="$second" ; continue ;;
+    '>  <MR>' ) local MR="$second" ; continue ;;
     '>  <MW>' ) local MW="$second" ; continue ;;
-    '>  <TPSA>' ) local TPSA="$second" ; continue ;;
-    '>  <smiles>' ) local SMILES="$second" ; continue ;;
-    '>  <InChI>' ) local InChI="$(cut -d '	' -f 1 <<< $second)" ; continue ;;
-    '>  <lead_like>' ) eval local lead_like=\$$second ; continue ;;
-    '>  <drug_like>' ) eval local drug_like=\$$second ; continue ;;
-    '>  <PPI_like>' ) eval local PPI_like=\$$second ; continue ;;
-    '>  <fragment_like>' ) eval local fragment_like=\$$second ; continue ;;
-    '>  <ext_fragment_like>' ) eval local ext_fragment_like=\$$second ; continue ;;
-    '>  <kinase_like>' ) eval local kinase_like=\$$second ; continue ;;
-    '>  <GPCR_like>' ) eval local GPCR_like=\$$second ; continue ;;
-    '>  <NR_like>' )  eval local NR_like=\$$second ; continue ;;
-    '>  <NP_like>' ) eval local NP_like=\$$second ; continue ;;
-    '>  <is_3D>' ) local is_3d='../sdf-3d/' ; continue ;;
-    '' ) break ;;
+    '>  <nF>' ) local nF="$second" ; continue ;;
+    '>  <sbonds>' ) local sbonds="$second" ; continue ;;
+    '>  <tbonds>' ) local tbonds="$second" ; continue ;;
+    '>  <TPSA>' ) local TPSA="$second" ; continue ;;    '' ) break ;;
     * ) continue ;;
   esac
 done
+
 
 [ "$ID" ] || local \
 ID=$(head -n1 $1 | cut -d '_' -f1)
@@ -142,14 +154,15 @@ local SMILES="$(obabel -i sdf $1 -o smiles 2> /dev/null)"
 
 local positive=$(awk -F"+" '{print NF-1}' <<< "$SMILES")
 local negative=$(awk -F"-" '{print NF-1}' <<< "$SMILES")
+local hashalo=$(awk -F"[FP]|Cl" '{print NF-1}' <<< "$SMILES")
 
 if [ ! "${ID:0:1}" = 'Z' ]
 then
-  echo "\"$ID\",\"$VERIFIED_AMOUNT_MG$lead_like\",\"$UNVERIFIED_AMOUNT_MG$drug_like\",\"$PRICERANGE_5MG$PPI_like\",\"$PRICERANGE_1MG$fragment_like\",\"$PRICERANGE_50MG$ext_fragment_like\",\"$IS_SC$kinase_like\",\"$IS_BB$GPCR_like\",\"$COMPOUND_STATE$NR_like\",\"$QC_METHOD$NP_like\",\"$HBA1\",\"$HBD\",\"$logP\",\"$MW\",\"$TPSA\",\"$formula\",\"$SMILES\",\"$positive\",\"$negative\",\"$InChI\",\"$InChIKey\"" >> ./meta/${ID:0:1}.csv
+  echo "\"$ID\",\"$VERIFIED_AMOUNT_MG$lead_like\",\"$UNVERIFIED_AMOUNT_MG$drug_like\",\"$PRICERANGE_5MG$PPI_like\",\"$PRICERANGE_1MG$fragment_like\",\"$PRICERANGE_50MG$ext_fragment_like\",\"$IS_SC$kinase_like\",\"$IS_BB$GPCR_like\",\"$COMPOUND_STATE$NR_like\",\"$QC_METHOD$NP_like\",\"$SMILES\",\"$positive\",\"$negative\",\"$hashalo\",\"$abonds\",\"$atoms\",\"$bonds\",\"$cansmi\",\"$cansmiNS\",\"$dbonds\",\"$formula\",\"$HBA1\",\"$HBA2\",\"$HBD\",\"$InChI\",\"$InChIKey\",\"$logP\",\"$MP\",\"$MR\",\"$MW\",\"$nF\",\"$sbonds\",\"$tbonds\",\"$TPSA\"" >> ./meta/${ID:0:1}.csv
   mv "$1" ./sdf-2d/$ID.sdf
 else
   mv "$1" ./sdf-3d/$ID.sdf
-  echo "\"$ID\",\"$HBA1\",\"$HBD\",\"$logP\",\"$MW\",\"$TPSA\",\"$formula\",\"$SMILES\",\"$positive\",\"$negative\",\"$InChI\",\"$InChIKey\"" >> ./meta/Z.csv
+  echo "\"$ID\",\"$SMILES\",\"$positive\",\"$negative\",\"$hashalo\",\"$abonds\",\"$atoms\",\"$bonds\",\"$cansmi\",\"$cansmiNS\",\"$dbonds\",\"$formula\",\"$HBA1\",\"$HBA2\",\"$HBD\",\"$InChI\",\"$InChIKey\",\"$logP\",\"$MP\",\"$MR\",\"$MW\",\"$nF\",\"$sbonds\",\"$tbonds\",\"$TPSA\"" >> ./meta/Z.csv
   obabel ./sdf-3d/$ID.sdf -o pdbqt -O ./pdbqt/$ID.pdbqt &> babel-logs/babel-output-pdbqt-$date.log
 fi
 }
