@@ -154,7 +154,7 @@ local SMILES="$(obabel -i sdf $1 -o smiles 2> /dev/null)"
 
 local positive=$(awk -F"+" '{print NF-1}' <<< "$SMILES")
 local negative=$(awk -F"-" '{print NF-1}' <<< "$SMILES")
-local hashalo=$(awk -F"[FP]|Cl" '{print NF-1}' <<< "$SMILES")
+local hashalo=$(awk -F"[F|Br|Cl|I" '{print NF-1}' <<< "$SMILES")
 
 if [ ! "${ID:0:1}" = 'Z' ]
 then
