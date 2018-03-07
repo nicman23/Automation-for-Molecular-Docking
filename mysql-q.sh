@@ -1,28 +1,10 @@
 #! /usr/bin/bash
 db_location='/home/common/babel'
+array_opt=( Pstv Ngtv abonds atoms bonds cansmi cansmiNS dbonds formula HBA1
+HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds TPSA )
 
-help_txt="--min-HBD
---max-HBD
+help_txt="
 
---min-MW
---max-MW
-
---min-TPSA
---max-TPSA
-
---min-LogP
---max-LogP
-
---min-ΗΒΑ1
---max-ΗΒΑ1
-
---min-Pstv
---max-Pstv
-
---min-Ngtv
---max-Ngtv
-
---db
 
 --zinc-mode
 --vina-threads
@@ -53,7 +35,7 @@ fi
 
 
 query_writer() {
-for i in HBA1 HBD LogP MW TPSA Positive Negative
+for i in ${array_opt[@]}
   do line_start=WHERE
   [ "$first" ] && line_start=AND
   max_i=max_$i
@@ -132,8 +114,7 @@ echo 'function getargs() {'
 echo '}'
 }
 
-array_opt=( Pstv Ngtv abonds atoms bonds cansmi cansmiNS dbonds formula HBA1
- HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds TPSA )
+
 
 eval "$(creategetargs ${array_opt[@]})"
 getargs $@
@@ -150,12 +131,13 @@ done > haloresults
 }
 
 if [ "$vina_cfg" ]
-then if [ -e "./results" ]
-  then read -p "./results found, do you want to use it?" -n 1 -r
-    if [[ $REPLY =~ ^[Nn]$ ]]
-      then echo 'Searching - this could take a lot of time (see mysql threads)'
-      db_loop
-    fi
+then findoutput=$(find results haloresults -maxdepth 1)
+  if [ $"findoutput"]
+    then read -p "$(echo $findoutput) found, do you want to use it?" -n 1 -r
+      if [[ $REPLY =~ ^[Nn]$ ]]
+        then echo 'Searching - this could take a lot of time (see mysql threads)'
+        db_loop
+      fi
 else
   echo 'Searching - this could take a lot of time (see mysql threads)'
   db_loop
@@ -168,4 +150,12 @@ else
 else
   echo 'Searching - this could take a lot of time (see mysql threads)'
   db_loop
+  out_dir=$(mktemp -d -p .)
+  (
+    cd $out_dir ; mkdir results haloresults
+    cat results | xargs -I{} cp $db_location/pdbqt/{}.pdbqt results/
+    cat haloresults | xargs -I{} cp $db_location/pdbqt/{}.pdbqt haloresults/
+    tar zcfv ../queryresults_$(date +'%s').tar.gz .
+  )
+  rm -rf $out_dir
 fi
