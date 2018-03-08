@@ -61,10 +61,10 @@ out_dir=$(mktemp -d -p .)
 vina_fun() {
 $vinabin --cpu 4 --config $vina_cfg --ligand "$1" $vina_rcp --out $out_dir/"$2" &> /dev/null
 }
-export vina_cfg vina_log vina_rcp out_dir
+export vina_cfg vina_log vina_rcp out_dir vinabin
 export -f vina_fun
 echo Starting Docking:
-parallel --eta --progress -j $threads vina_fun $db_location/pdbqt/{}.pdbqt {/}.pdbqt
+parallel --eta --progress -j $((threads/4)) --joblog /tmp/asd.log vina_fun $db_location/pdbqt/{}.pdbqt {/}.pdbqt
 score() {
 mv $@ $(sed '2q;d' $@ | cut -d '-' -f 2 | cut -d ' ' -f1)_$@
 }
@@ -76,7 +76,7 @@ find . -type f -printf "%f\n" |
 parallel --progress -j $threads score {/}
 echo Tarring $results best results.
 find . -type f -printf "%f\n" | sort -h |
-tail -n $results | tar zcfv ../vina-result_$(date +'%s').tar.gz \
+tail -n $results | tar zcfv ../$vinabin-result_$(date +'%s').tar.gz \
 --files-from -
 )
 echo Deleting temporary files
@@ -103,7 +103,7 @@ echo 'function getargs() {'
   echo '      --help            ) echo "$help_txt" ; exit 2 ;;
       --db              ) DB+=($2) ; shift 2 ;;
       --zinc-mode       ) zinc_mode=1 ; shift 1 ;;
-      --vina-threads    ) threads=$((($2+3)/4)) ; shift 2 ;;
+      --vina-threads    ) threads=$2 ; shift 2 ;;
       --vina-cfg        ) vina_cfg=$2 ; shift 2 ;;
       --vina-rcp        ) vina_rcp="--receptor $2" ; shift 2 ;;
       --vina-rlt        ) results="$2" ; shift 2 ;;
@@ -131,31 +131,36 @@ done > haloresults
 }
 
 if [ "$vina_cfg" ]
-then findoutput=$(find results haloresults -maxdepth 1)
-  if [ $"findoutput"]
+then findoutput="$(find results haloresults -maxdepth 1 2> /dev/null)"
+  if [ "$findoutput" ]
     then read -p "$(echo $findoutput) found, do you want to use it?" -n 1 -r
       if [[ $REPLY =~ ^[Nn]$ ]]
         then echo 'Searching - this could take a lot of time (see mysql threads)'
         db_loop
       fi
-else
-  echo 'Searching - this could take a lot of time (see mysql threads)'
-  db_loop
+  else
+    echo 'Searching - this could take a lot of time (see mysql threads)'
+    db_loop
   fi
-  echo
-  vinabin='vina'
-  cat results | vina_wrapper
-  vinabin='vinaSH'
-  cat haloresults | vina_wrapper
+    echo
+    if [ -e ./results ]
+    then vinabin='vina'
+      time cat results | vina_wrapper
+    fi
+    if [ -e ./haloresults ]
+    then vinabin='vinaSH'
+      time cat haloresults | vina_wrapper
+    fi
 else
   echo 'Searching - this could take a lot of time (see mysql threads)'
   db_loop
   out_dir=$(mktemp -d -p .)
   (
     cd $out_dir ; mkdir results haloresults
-    cat results | xargs -I{} cp $db_location/pdbqt/{}.pdbqt results/
-    cat haloresults | xargs -I{} cp $db_location/pdbqt/{}.pdbqt haloresults/
+    cat ../results | xargs -I{} cp $db_location/pdbqt/{}.pdbqt results/
+    cat ../haloresults | xargs -I{} cp $db_location/pdbqt/{}.pdbqt haloresults/
     tar zcfv ../queryresults_$(date +'%s').tar.gz .
   )
   rm -rf $out_dir
 fi
+
