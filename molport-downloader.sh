@@ -1,6 +1,7 @@
 #! /usr/bin/env bash
 url="ftp://$@@www.molport.com/molport_database/"
 done_txt="/home/common/babel/.molport_downloader"
+db_location='/home/common/babel'
 
 remove_done() {
 for i in ${already_done[@]}
@@ -29,9 +30,9 @@ for i in ${date[@]}
   done
     [ -e 'lmiis_added.sdf' ] && mv lmiis_added.sdf $i\_added.sdf
     if [ -e 'lmiis_removed.txt' ]
-      then cd sdf-2d ; rm -rf $(cat ../lmiis_removed.txt)
-      cd ../sdf-3d ; rm -rf $(cat ../lmiis_removed.txt)
-      cd ..
+      then for i in sdf-2d sdf-3d pdbqt
+        do cat ../lmiis_removed.txt | xargs -I{} rm $db_location/$i/{}
+      done
       rm lmiis_removed.txt
     fi
 done

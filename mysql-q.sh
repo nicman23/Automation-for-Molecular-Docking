@@ -3,15 +3,23 @@ db_location='/home/common/babel'
 array_opt=( Pstv Ngtv abonds atoms bonds cansmi cansmiNS dbonds formula HBA1
 HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds TPSA )
 
-help_txt="
+help_txt="To search the databases you need:
 
+1. Specify the database(s) by using the --db $(echo -e "\e[4mnameofdb\e[0m") arguement, one or multiple times
 
---zinc-mode
---vina-threads
---vina-log
---vina-cfg
---vina-rcp
---vina-rlt
+2. Optionally use filters with --max-$(echo -e "\e[4mSUFFIX\e[0m") or --min-$(echo -e "\e[4mSUFFIX\e[0m"). Available suffixes:
+$(echo ${array_opt[@]} | fold -s -w 80  | sed -e "s|^|\t- |g")
+
+When run without enough valid vina options, you will only receive the results of your query.
+Otherwise the script will automatically run the resulting ligands to your specified receptor.
+
+Vina Options:
+  --zinc-mode
+  --vina-threads
+  --vina-log
+  --vina-cfg
+  --vina-rcp
+  --vina-rlt
 "
 
 mysql_q() {
@@ -154,6 +162,10 @@ then findoutput="$(find results haloresults -maxdepth 1 2> /dev/null)"
 else
   echo 'Searching - this could take a lot of time (see mysql threads)'
   db_loop
+  read -p "Do you want the resulting pdbqts?" -n 1 -r
+echo    # (optional) move to a new line
+if [[ $REPLY =~ ^[Yy]$ ]]
+then
   out_dir=$(mktemp -d -p .)
   (
     cd $out_dir ; mkdir results haloresults
@@ -162,5 +174,7 @@ else
     tar zcfv ../queryresults_$(date +'%s').tar.gz .
   )
   rm -rf $out_dir
+fi
+fi
 fi
 
