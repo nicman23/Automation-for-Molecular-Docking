@@ -31,7 +31,7 @@ split_file_sdf
 
 echo Converting sdf input files
 find csplit-output -type f -printf '%f\n' |
-parallel -j $threads -I {} obabel -i sdf csplit-output/{} -r \
+parallel --eta --progress -j $threads -I {} obabel -i sdf csplit-output/{} -r \
 --add 'abonds atoms bonds cansmi cansmiNS dbonds formula HBA1 HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds title TPSA' \
 -p 7.4 -m -o sdf -O babel-output/{} &> babel-logs/babel-output-$date-$1.log
 rm -rf csplit-output
@@ -43,7 +43,7 @@ main() {
 
 echo Second Stage: Getting Info on each file and moving them
 find ./babel-output/ -type f |
-parallel -j $threads caser_wrap {}
+parallel --eta --progress -j $threads caser_wrap {}
 
 echo Last Stage: Adding mySQL entries
 for I in MolPort Ambinter Zinc
@@ -64,7 +64,7 @@ cd csplit-output
 for i in ${sdf_files[@]}
   do echo ../$i
 done |
-parallel --bar -j 4 cspit_sdf {} {/} |
+parallel --eta --progress -j 4 cspit_sdf {} {/} |
 echo Found $(wc -l) molecules
 )
 

@@ -1,6 +1,6 @@
 cd /home/common/babel
 export PATH="/home/common/babel/Automation-for-Molecular-Docking:$PATH"
-threads=30
+threads=20
 
 (
 mkdir Downloads-tmp ; cd Downloads-tmp
@@ -14,13 +14,14 @@ for i in {1..6} # add here for new?
 done
 )
 
-wget -c --limit-rate=3m http://files.docking.org/catalogs/50/molport/molport.info.txt
+wget -c --limit-rate=3m http://files.docking.org/catalogs/50/molportbbe/molportbbe.info.txt.gz
+wget -c --limit-rate=3m http://files.docking.org/catalogs/50/molporte/molporte.info.txt.gz
 wget -c --limit-rate=3m http://files.docking.org/catalogs/10/ambint/ambint.info.txt.gz
 find . -name '*.gz' -type f -exec gunzip {} \;
-zinc-to-third.sh molport.info.txt ambint.info.txt
+zinc-to-third.sh molportbbe.info.txt molporte.info.txt ambint.info.txt
 )
 
-find Downloads-tmp/ -name '*.sdf' -type f | digest-babel.sh
-gen3d.sh
+find Downloads-tmp/ -name '*.sdf' -type f | digest-babel.sh -T $threads
+gen3d.sh $threads
 
-rm -rf Downloads-tmp
+#rm -rf Downloads-tmp
