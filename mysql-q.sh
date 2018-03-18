@@ -1,7 +1,7 @@
 #! /usr/bin/bash
 db_location='/home/common/babel'
 array_opt=( Pstv Ngtv abonds atoms bonds cansmi cansmiNS dbonds formula HBA1
-HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds TPSA )
+HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds TPSA heavya)
 
 help_txt="To search the databases you need:
 
@@ -163,7 +163,7 @@ else
   echo 'Searching - this could take a lot of time (see mysql threads)'
   db_loop
   read -p "Do you want the resulting pdbqts?" -n 1 -r
-echo    # (optional) move to a new line
+echo
 if [[ $REPLY =~ ^[Yy]$ ]]
 then
   out_dir=$(mktemp -d -p .)
@@ -177,4 +177,3 @@ then
 fi
 fi
 fi
-

@@ -54,17 +54,17 @@ do for i in meta/${I:0:1}*
 done
 }
 
-cspit_sdf() {
+csplit_sdf() {
 csplit $1 /\$\$\$\$\/+1 '{*}' -z -b %02d$2
 }
-export -f cspit_sdf
+export -f csplit_sdf
 
 split_file_sdf() (
 cd csplit-output
 for i in ${sdf_files[@]}
   do echo ../$i
 done |
-parallel --progress -j 4 cspit_sdf {} {/} |
+parallel --progress -j $threads csplit_sdf {} {/} |
 echo Found $(wc -l) molecules
 )
 
@@ -155,14 +155,15 @@ local SMILES="$(obabel -i sdf $1 -o smiles 2> /dev/null)"
 local positive=$(awk -F"+" '{print NF-1}' <<< "$SMILES")
 local negative=$(awk -F"-" '{print NF-1}' <<< "$SMILES")
 local hashalo=$(awk -F"F|Br|Cl|I|S" '{print NF-1}' <<< "$SMILES")
+local heavyatoms=$(echo $SMILES | obabel -ismiles -otxt --append atoms -d -l5)
 
 if [ ! "${ID:0:1}" = 'Z' ]
 then
-  echo "\"$ID\",\"$VERIFIED_AMOUNT_MG$lead_like\",\"$UNVERIFIED_AMOUNT_MG$drug_like\",\"$PRICERANGE_5MG$PPI_like\",\"$PRICERANGE_1MG$fragment_like\",\"$PRICERANGE_50MG$ext_fragment_like\",\"$IS_SC$kinase_like\",\"$IS_BB$GPCR_like\",\"$COMPOUND_STATE$NR_like\",\"$QC_METHOD$NP_like\",\"$SMILES\",\"$positive\",\"$negative\",\"$hashalo\",\"$abonds\",\"$atoms\",\"$bonds\",\"$cansmi\",\"$cansmiNS\",\"$dbonds\",\"$formula\",\"$HBA1\",\"$HBA2\",\"$HBD\",\"$InChI\",\"$InChIKey\",\"$logP\",\"$MP\",\"$MR\",\"$MW\",\"$nF\",\"$sbonds\",\"$tbonds\",\"$TPSA\"" >> ./meta/${ID:0:1}.csv
+  echo "\"$ID\",\"$VERIFIED_AMOUNT_MG$lead_like\",\"$UNVERIFIED_AMOUNT_MG$drug_like\",\"$PRICERANGE_5MG$PPI_like\",\"$PRICERANGE_1MG$fragment_like\",\"$PRICERANGE_50MG$ext_fragment_like\",\"$IS_SC$kinase_like\",\"$IS_BB$GPCR_like\",\"$COMPOUND_STATE$NR_like\",\"$QC_METHOD$NP_like\",\"$SMILES\",\"$positive\",\"$negative\",\"$hashalo\",\"$heavyatoms\",\"$abonds\",\"$atoms\",\"$bonds\",\"$cansmi\",\"$cansmiNS\",\"$dbonds\",\"$formula\",\"$HBA1\",\"$HBA2\",\"$HBD\",\"$InChI\",\"$InChIKey\",\"$logP\",\"$MP\",\"$MR\",\"$MW\",\"$nF\",\"$sbonds\",\"$tbonds\",\"$TPSA\"" >> ./meta/${ID:0:1}.csv
   mv "$1" ./sdf-2d/$ID.sdf
 else
   mv "$1" ./sdf-3d/$ID.sdf
-  echo "\"$ID\",\"$SMILES\",\"$positive\",\"$negative\",\"$hashalo\",\"$abonds\",\"$atoms\",\"$bonds\",\"$cansmi\",\"$cansmiNS\",\"$dbonds\",\"$formula\",\"$HBA1\",\"$HBA2\",\"$HBD\",\"$InChI\",\"$InChIKey\",\"$logP\",\"$MP\",\"$MR\",\"$MW\",\"$nF\",\"$sbonds\",\"$tbonds\",\"$TPSA\"" >> ./meta/Z.csv
+  echo "\"$ID\",\"$SMILES\",\"$positive\",\"$negative\",\"$hashalo\",\"$heavyatoms\",\"$abonds\",\"$atoms\",\"$bonds\",\"$cansmi\",\"$cansmiNS\",\"$dbonds\",\"$formula\",\"$HBA1\",\"$HBA2\",\"$HBD\",\"$InChI\",\"$InChIKey\",\"$logP\",\"$MP\",\"$MR\",\"$MW\",\"$nF\",\"$sbonds\",\"$tbonds\",\"$TPSA\"" >> ./meta/Z.csv
   obabel ./sdf-3d/$ID.sdf -o pdbqt -O ./pdbqt/$ID.pdbqt &> babel-logs/babel-output-pdbqt-$date.log
 fi
 }
