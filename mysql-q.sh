@@ -67,9 +67,9 @@ echo $line_start $I.\`Halo\` $halo
 vina_wrapper() {
 out_dir=$(mktemp -d -p .)
 vina_fun() {
-$vinabin --cpu 4 --config $vina_cfg --ligand "$1" $vina_rcp --out $out_dir/"$2" &> /dev/null
+vinaSH --cpu 4 --config $vina_cfg --ligand "$1" $vina_rcp --out $out_dir/"$2" &> /dev/null
 }
-export vina_cfg vina_log vina_rcp out_dir vinabin
+export vina_cfg vina_log vina_rcp out_dir
 export -f vina_fun
 echo Starting Docking:
 parallel --eta --progress -j $((threads/4)) --joblog /tmp/asd.log vina_fun $db_location/pdbqt/{}.pdbqt {/}.pdbqt
@@ -84,7 +84,7 @@ find . -type f -printf "%f\n" |
 parallel --progress -j $threads score {/}
 echo Tarring $results best results.
 find . -type f -printf "%f\n" | sort -h |
-tail -n $results | tar zcfv ../$vinabin-result_$(date +'%s').tar.gz \
+tail -n $results | tar zcfv ../vinaSH-result_$(date +'%s').tar.gz \
 --files-from -
 )
 echo Deleting temporary files
@@ -131,15 +131,11 @@ db_loop() {
 for I in ${DB[@]}
   do halo='= 0'
   query_writer | mysql_q
-done > results
-for I in ${DB[@]}
-  do halo='<> 0'
-  query_writer | mysql_q
-done > haloresults
+done > query
 }
 
 if [ "$vina_cfg" ]
-then findoutput="$(find results haloresults -maxdepth 1 2> /dev/null)"
+then findoutput="$(find query -maxdepth 1 2> /dev/null)"
   if [ "$findoutput" ]
     then read -p "$(echo $findoutput) found, do you want to use it?" -n 1 -r
       if [[ $REPLY =~ ^[Nn]$ ]]
@@ -151,13 +147,9 @@ then findoutput="$(find results haloresults -maxdepth 1 2> /dev/null)"
     db_loop
   fi
     echo
-    if [ -e ./results ]
-    then vinabin='vina'
-      time cat results | vina_wrapper
-    fi
-    if [ -e ./haloresults ]
-    then vinabin='vinaSH'
-      time cat haloresults | vina_wrapper
+    if [ -e ./query ]
+    then
+      time cat query | vina_wrapper
     fi
 else
   echo 'Searching - this could take a lot of time (see mysql threads)'
@@ -169,11 +161,10 @@ then
   out_dir=$(mktemp -d -p .)
   (
     cd $out_dir ; mkdir results haloresults
-    cat ../results | xargs -I{} cp $db_location/pdbqt/{}.pdbqt results/
-    cat ../haloresults | xargs -I{} cp $db_location/pdbqt/{}.pdbqt haloresults/
+    echo $PWD
+    cat ../query | xargs -I{} cp $db_location/pdbqt/{}.pdbqt results/
     tar zcfv ../queryresults_$(date +'%s').tar.gz .
   )
   rm -rf $out_dir
-fi
 fi
 fi
