@@ -17,16 +17,8 @@ sane() {
 
 main_smi() {
   echo Getting Info on each file and moving them
-  echo ${smi_files[*]} | xargs cat |
+  cat  ${smi_files[*]} |
   parallel --progress -j $threads --pipe getinfo_smi
-
-  echo Last Stage: Adding mySQL entries
-  for I in MolPort Ambinter Zinc
-  do for i in meta/${I:0:1}*
-    do add_to_sql "$i" &> /dev/null
-      rm "$i"
-    done
-  done
 }
 
 main_sdf() {
@@ -43,18 +35,18 @@ main_sdf() {
   echo Second Stage: Getting Info on each file and moving them
   find ./babel-output/ -type f |
   parallel --progress -j $threads getinfo_sdf {}
-  echo Last Stage: Adding mySQL entries
-  for I in MolPort Ambinter Zinc
-  do for i in meta/${I:0:1}*
-    do add_to_sql "$i" &> /dev/null
-      rm "$i"
-    done
-  done
 }
 
 main() {
   [[ "${sdf_files[*]}" ]] && main_sdf
   [[ "${smi_files[*]}" ]] && main_smi
+  echo Last Stage: Adding mySQL entries
+  for I in MolPort Ambinter Zinc
+  do for i in meta/${I:0:1}*
+    do add_to_sql "$i"
+      rm "$i"
+    done 2> /dev/null
+  done
 }
 
 csplit_sdf() {
@@ -72,16 +64,19 @@ split_file_sdf() (
 )
 
 getinfo_smi() {
-  local line=($(cut -d '	' -f -3))
-  local computed=($(echo ${line[0]}| obabel -ismi -r --append 'abonds atoms bonds dbonds formula HBA1 HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds TPSA' -osmi 2> /dev/null ))
-  local SMILES=${computed[0]}
-  local ID=${line[2]}
-  local positive=$(echo "$SMILES" | awk -F"+" '{print NF-1}')
-  local negative=$(echo "$SMILES" | awk -F"-" '{print NF-1}')
-  local hashalo=$(echo "$SMILES" | awk -F"F|Br|Cl|I|S" '{print NF-1}')
-  local heavyatoms=$(echo $SMILES | obabel -ismiles -otxt --append atoms -d 2> /dev/null)
-  echo \"$ID $SMILES $positive $negative $hashalo $heavyatoms ${computed[*]:1}\"|
-  sed -e 's/ /\"\,\"/g' >> ./meta/${ID:0:1}.csv
+  while read lines
+  do
+    local line=($(echo "$lines" | cut -d "$(echo -e '\t')" -f -3))
+    local computed=($(echo ${line[0]}| obabel -ismi -r --append 'abonds atoms bonds dbonds formula HBA1 HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds TPSA' -osmi 2> /dev/null ))
+    local SMILES=${computed[0]}
+    local ID=${line[2]}
+    local positive=$(echo "$SMILES" | awk -F"+" '{print NF-1}')
+    local negative=$(echo "$SMILES" | awk -F"-" '{print NF-1}')
+    local hashalo=$(echo "$SMILES" | awk -F"F|Br|Cl|I|S" '{print NF-1}')
+    local heavyatoms=$(echo $SMILES | obabel -ismiles -otxt --append atoms -d 2> /dev/null)
+    echo \"$ID $SMILES $positive $negative $hashalo $heavyatoms ${computed[*]:1}\"|
+    sed -e 's/ /\"\,\"/g' >> ./meta/${ID:0:1}.csv
+  done
 }
 export -f getinfo_smi
 
@@ -148,6 +143,10 @@ while true
         then smi_files+=("$1")
         else echo file not found: $1
       fi ; shift 1 ;;
+    *.txt ) if [ -e "$1" ]
+        then smi_files+=("$1")
+        else echo file not found: $1
+      fi ; shift 1 ;;
     * ) shift 1 ;;
   esac
 done
@@ -160,6 +159,10 @@ while read -t 1 line
         else echo file not found: $line
       fi ; shift 1 ;;
     *.smi ) if [ -e "$line" ]
+        then smi_files+=("$line")
+        else echo file not found: $line
+      fi ; shift 1 ;;
+    *.txt ) if [ -e "$line" ]
         then smi_files+=("$line")
         else echo file not found: $line
       fi ; shift 1 ;;

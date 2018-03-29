@@ -10,10 +10,9 @@ mysql -u nikosf -pa -e "use BABEL" -e "
 "
 }
 
-cat $@ |
+cat $* |
 cut -d "	" -f -2 |
 sed -e "s/^/\"/;s/$/\"/;s/	/\",\"/" > /tmp/zinc.csv
 
 add_to_mysql Zinc_ext /tmp/zinc.csv
 rm /tmp/zinc.csv
-

@@ -8,7 +8,7 @@ help_txt="To search the databases you need:
 1. Specify the database(s) by using the --db $(echo -e "\e[4mnameofdb\e[0m") arguement, one or multiple times
 
 2. Optionally use filters with --max-$(echo -e "\e[4mSUFFIX\e[0m") or --min-$(echo -e "\e[4mSUFFIX\e[0m"). Available suffixes:
-$(echo ${array_opt[@]} | fold -s -w 80  | sed -e "s|^|\t- |g")
+$(echo ${array_opt[*]} | fold -s -w 80  | sed -e "s|^|\t- |g")
 
 When run without enough valid vina options, you will only receive the results of your query.
 Otherwise the script will automatically run the resulting ligands to your specified receptor.
@@ -26,9 +26,10 @@ mysql_q() {
 echo Searching $I 1>&2
 if [ ! "$I" = 'Zinc' ]
   then mysql --login-path=local -N -e "use BABEL" -e "
-    SELECT IF(Zinc_ext.ID IS NULL,${I}.ID,Zinc_ext.ID)
+    SELECT IF(Zinc_ext.ID IS NULL,Frog.ID,Zinc_ext.ID)
     FROM ${I}
     LEFT JOIN Zinc_ext ON ${I}.ID = Zinc_ext.EXT_ID
+    LEFT JOIN Frog ON ${I}.ID = Frog.EXT_ID
     $(cat -)
   ;
   "
@@ -43,7 +44,7 @@ fi
 
 
 query_writer() {
-for i in ${array_opt[@]}
+for i in ${array_opt[*]}
   do line_start=WHERE
   [ "$first" ] && line_start=AND
   max_i=max_$i
@@ -55,11 +56,10 @@ for i in ${array_opt[@]}
     else echo $line_start $I.\`$i\` \<\= ${!max_i}
       first=0
     fi
-    else if [ "${!min_i}" ]
+    elif [ "${!min_i}" ]
       then echo $line_start $I.\`$i\` \>\= ${!min_i}
       first=0
     fi
-  fi
 done
 echo $line_start $I.\`Halo\` $halo
 }
@@ -74,11 +74,11 @@ export -f vina_fun
 echo Starting Docking:
 parallel --eta --progress -j $((threads/4)) --joblog /tmp/asd.log vina_fun $db_location/pdbqt/{}.pdbqt {/}.pdbqt
 score() {
-mv $@ $(sed '2q;d' $@ | cut -d '-' -f 2 | cut -d ' ' -f1)_$@
+mv "$*" $(sed '2q;d' "$*" | cut -d '-' -f 2 | cut -d ' ' -f1)_$*
 }
 export -f score
 (
-cd $out_dir
+cd $out_dir || exit 5
 echo Renaming results per score:
 find . -type f -printf "%f\n" |
 parallel --progress -j $threads score {/}
@@ -94,7 +94,7 @@ echo Results are in vina-result_$(date +'%s').tar.gz
 
 results=1000
 
-if [ -z "$@" ] 2> /dev/null
+if [ -z "$*" ] 2> /dev/null
   then echo --help for help
   exit 2
 fi
@@ -103,7 +103,7 @@ creategetargs() {
 echo 'function getargs() {'
   echo '  while true
     do case $1 in'
-  for i in $@
+  for i in $*
     do for I in min max
       do echo -e '      '--$I-$i'  \t'\) $I\_$i=\$2 ';' shift 2 ';;'
     done
@@ -124,11 +124,11 @@ echo '}'
 
 
 
-eval "$(creategetargs ${array_opt[@]})"
-getargs $@
+eval "$(creategetargs ${array_opt[*]})"
+getargs $*
 
 db_loop() {
-for I in ${DB[@]}
+for I in ${DB[*]}
   do halo='= 0'
   query_writer | mysql_q
 done > query
@@ -160,7 +160,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]
 then
   out_dir=$(mktemp -d -p .)
   (
-    cd $out_dir ; mkdir results haloresults
+    cd $out_dir || exit 5; mkdir results haloresults
     echo $PWD
     cat ../query | xargs -I{} cp $db_location/pdbqt/{}.pdbqt results/
     tar zcfv ../queryresults_$(date +'%s').tar.gz .
