@@ -1,5 +1,7 @@
 #! /usr/bin/bash
-db_location='/home/common/babel'
+db_location='.'
+# db_location='/home/common/babel'
+
 array_opt=( Pstv Ngtv abonds atoms bonds cansmi cansmiNS dbonds formula HBA1
 HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds TPSA heavya)
 
