@@ -9,9 +9,20 @@ discover() {
       ON ${I}.ID = Zinc_ext.EXT_ID
     LEFT JOIN Frog
       ON ${I}.ID = Frog.EXT_ID
-    WHERE NOT ${I}.SMILES LIKE '%@%';"|
+    WHERE NOT ${I}.SMILES LIKE '%@%'
+    LIMIT 100;"|
     grep '^[A-Z]' > to_convert
   done
+}
+
+add_to_sql() {
+  mysql -pa -e "use BABEL" -e "
+    LOAD DATA LOCAL INFILE '$1'
+    INTO TABLE ${I}
+    FIELDS TERMINATED BY '\,'
+    OPTIONALLY ENCLOSED BY '\"'
+    LINES TERMINATED BY '\n' ;
+  "
 }
 
 Frog_f() {
@@ -19,11 +30,11 @@ Frog_f() {
   local origin=$PWD
   (
     cd $tempdir || exit 5
-    echo "$1" | www_iMolecule.py -ismi - -opdbqt "$2" -wrkPath "$tempdir" -split -logFile /dev/stdout &> error.log
+    echo "$1" | www_iMolecule.py -ismi - -opdbqt "$2" -wrkPath "$tempdir" -logFile /dev/stdout &> error.log
     local pdbqts=$(find . -name \*pdbqt)
     if [ "$pdbqts" ]
     then
-      mv *pdbqt $origin/pdbqt/ 2> /dev/null
+      mv ${pdbqts[*]} $origin/pdbqt/ 2> /dev/null
       for i in ${pdbqts[*]}
       do echo $2,$(basename ${i%.*}) >> $origin/meta/Frog.csv
       done
@@ -42,12 +53,13 @@ main() {
   else discover
   fi
   echo Converting $(wc -l to_convert) files
-  parallel --progress -j $threads --colsep '\t' Frog_f {1} {2} :::: to_convert
+  parallel --progress -j $threads --colsep '\t' Frog_f {2} {1} :::: to_convert
+  add_to_sql ./meta/Frog.csv
+  # rm meta/Frog.csv
 }
 
 sane() {
-  [ -e sdf-2d ] || exit 2
-  for i in babel-logs pdbqt
+  for i in pdbqt meta
   do [ -e $i ] || mkdir $i
   done
   [ "$threads" -eq "$threads" ] &> /dev/null ||
