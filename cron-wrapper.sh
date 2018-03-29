@@ -6,13 +6,11 @@ threads=20
 (
   mkdir Downloads-tmp ; cd Downloads-tmp || exit 5
   molport-downloader.sh $(cat ../.molport_downloader_pass)
-  bash `which zinc15-downloader-dash.sh` download #no dash installed
+  zinc-downloader.sh download
   (
     mkdir ambinter ; cd ambinter || exit 5
-    for i in {1..6} # add here for new?
-    do wget -c --limit-rate=3M -c http://www.ambinter.com/bundles/ambintersearch/download/Ambinter3D-$i.zip
-      unzip Ambinter3D-$i.zip
-    done
+    curl 'http://www.ambinter.com/bundles/ambintersearch/download/ambinter_catalogue_3D_2018v1.mdl.tar.bz2' |
+    tar -jxf -
   )
 
   wget -c --limit-rate=3m http://files.docking.org/catalogs/50/molportbbe/molportbbe.info.txt.gz

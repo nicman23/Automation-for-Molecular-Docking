@@ -1,7 +1,7 @@
 #! /usr/bin/env bash
 url="ftp://$*@www.molport.com/molport_database/"
-done_txt="$PWD/.molport_downloader"
 db_location='/home/common/babel'
+done_txt="$db_location/.molport_downloader"
 
 remove_done() {
   for i in ${already_done[*]}
@@ -11,37 +11,23 @@ remove_done() {
 
 download_sdf() {
   date=( $(curl $url | grep '^d' | rev | cut -d ' ' -f1 | rev | grep -P '(?<!\d)\d{4}(?!\d)-(?<!\d)\d{2}(?!\d)') )
+  echo ${date[*]} | tr ' ' '\n'  > $done_txt
   remove_done
-  if [ "$first_run" == '1' ]
-  then echo ${date[*]} | tr ' ' '\n'  > $done_txt
-    date=( $(echo ${date[*]} | rev | cut -d ' ' -f1 | rev) )
-  fi
+  last_date="$(echo ${date[*]} | rev | cut -d ' ' -f1 | rev)"
+  array=( $(curl "$url${last_date}/All Stock Compounds/SMILES/" | grep '.gz' | rev | cut -d ' ' -f1 | rev) )
+  for I in ${array[*]}
+  do echo curl -C - --limit-rate 2M "$url$i/All Stock Compounds/SMILES/$I" |
+    gunzip | tail -n+2 >> molport.smi
+  done
   for i in ${date[*]}
-  do if [ ! "$first_run" == '1' ]
-    then addition='Changed Since Previous Update/'
-      echo $i | tr ' ' '\n' >> $done_txt
-    fi
-    array=( $(curl "$url$i/All Stock Compounds/$addition" | grep '.gz' | rev | cut -d ' ' -f1 | rev) )
-    for I in ${array[*]}
-    do echo curl -C - --limit-rate 2M "$url$i/All Stock Compounds/$addition/$I" -O
-      echo ungziping
-      gunzip $I
-    done
-    [ -e 'lmiis_added.sdf' ] && mv lmiis_added.sdf $i\_added.sdf
-    if false #[ -e 'lmiis_removed.txt' ]
-    then
-      for ii in sdf-2d sdf-3d pdbqt
-      do cat ../lmiis_removed.txt | xargs -I{} rm $db_location/$ii/{}
-      done
-      rm lmiis_removed.txt
-    fi
+  do curl "$url$i/All Stock Compounds/Changed Since Previous Update/lmiis_removed.txt.gz" |
+    gunzip | xargs -I{} rm $db_location/pdbqt/{}*
   done
 }
 
 main() {
   if [ -e $done_txt ]
   then already_done=( $(cat $done_txt) )
-  else first_run=1
   fi
   download_sdf
   echo Done
