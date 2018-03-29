@@ -9,7 +9,7 @@ discover() {
       ON ${I}.ID = Zinc_ext.EXT_ID
     LEFT JOIN Frog
       ON ${I}.ID = Frog.EXT_ID
-    WHERE NOT ${I}.SMILES LIKE '%@%';"|
+    ;"|
     grep '^[A-Z]' > to_convert
   done
 }
