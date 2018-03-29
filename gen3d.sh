@@ -35,7 +35,7 @@ Frog_f() {
     then
       mv ${pdbqts[*]} $origin/pdbqt/ 2> /dev/null
       for i in ${pdbqts[*]}
-      do echo $2,$(basename ${i%.*}) >> $origin/meta/Frog.csv
+      do echo \"$2\",\"$(basename ${i%.*})\" >> $origin/meta/Frog.csv
       done
     else
       echo -e $1'\t'$2 >> $origin/badsmi
