@@ -25,7 +25,7 @@ Vina Options:
 
 mysql_q() {
 echo Searching $I 1>&2
-if [ ! "$I" = 'Zinc' ]
+if [ ! "$I" = 'Zinc' ] && [ ! "$I" = 'Ambinter' ]
   then mysql --login-path=local -N -e "use BABEL" -e "
     SELECT IF(Zinc_ext.ID IS NULL,Frog.ID,Zinc_ext.ID)
     FROM ${I}

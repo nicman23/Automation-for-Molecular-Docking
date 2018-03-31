@@ -16,25 +16,17 @@ sane() {
 }
 
 main_smi() {
-  echo Getting Info on each file and moving them
-  cat  ${smi_files[*]} |
+  echo Splitting ${#smi_files[*]} smi files
+  cat ${smi_files[*]} |
   parallel --progress -j $threads --pipe getinfo_smi
 }
 
 main_sdf() {
+  mkdir /dev/shm/babel/
   echo Splitting ${#sdf_files[*]} sdf files
-  split_file_sdf
-
-  echo Converting sdf input files
-  find csplit-output -type f -printf '%f\n' |
-  parallel --progress -j $threads -I {} obabel -i sdf csplit-output/{} -r \
-    --add 'abonds atoms bonds dbonds formula HBA1 HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds TPSA' \
-    -m -o sdf -O babel-output/{} &> babel-logs/babel-output-$date.log
-  rm -rf csplit-output
-
-  echo Second Stage: Getting Info on each file and moving them
-  find ./babel-output/ -type f |
-  parallel --progress -j $threads getinfo_sdf {}
+  cat ${sdf_files[*]} |
+  parallel -j $threads -N1 --recend '$$$$' --pipe getinfo_convert_sdf {#}
+  rm -r /dev/shm/babel/
 }
 
 main() {
@@ -48,20 +40,6 @@ main() {
     done 2> /dev/null
   done
 }
-
-csplit_sdf() {
-  csplit $1 /\$\$\$\$\/+1 '{*}' -z -b %02d$2
-}
-export -f csplit_sdf
-
-split_file_sdf() (
-  cd csplit-output || exit 5
-  for i in ${sdf_files[*]}
-  do echo ../$i
-  done |
-  parallel --progress -j $threads csplit_sdf {} {/} |
-  echo Found "$(wc -l)" molecules
-)
 
 getinfo_smi() {
   while read lines
@@ -80,46 +58,21 @@ getinfo_smi() {
 }
 export -f getinfo_smi
 
+getinfo_convert_sdf() {
+  tail -n+2 > /dev/shm/babel/$1.sdf
 
-getinfo_sdf() {
-  grep '^>' -A1 --no-group-separator "$@" |
-  while read first ; read second
-    do case "$first" in
-      '>  <abonds>' ) local abonds="$second" ; continue ;;
-      '>  <atoms>' ) local atoms="$second" ; continue ;;
-      '>  <bonds>' ) local bonds="$second" ; continue ;;
-      '>  <dbonds>' ) local dbonds="$second" ; continue ;;
-      '>  <formula>' ) local formula="$second" ; continue ;;
-      '>  <HBA1>' ) local HBA1="$second" ; continue ;;
-      '>  <HBA2>' ) local HBA2="$second" ; continue ;;
-      '>  <HBD>' ) local HBD="$second" ; continue ;;
-      '>  <InChI>' ) local InChI="$second" ; continue ;;
-      '>  <InChIKey>' ) local InChIKey="$second" ; continue ;;
-      '>  <logP>' ) local logP="$second" ; continue ;;
-      '>  <MP>' ) local MP="$second" ; continue ;;
-      '>  <MR>' ) local MR="$second" ; continue ;;
-      '>  <MW>' ) local MW="$second" ; continue ;;
-      '>  <nF>' ) local nF="$second" ; continue ;;
-      '>  <sbonds>' ) local sbonds="$second" ; continue ;;
-      '>  <tbonds>' ) local tbonds="$second" ; continue ;;
-      '>  <TPSA>' ) local TPSA="$second" ; continue ;;    '' ) break ;;
-      * ) continue ;;
-    esac
-  done
-
-  ID=$(head -n1 $1 | cut -d '_' -f1)
-  local SMILES="$(obabel -i sdf $1 -o smiles 2> /dev/null)"
-
-  local positive=$(echo "$SMILES" | awk -F"+" '{print NF-1}')
-  local negative=$(echo "$SMILES" | awk -F"-" '{print NF-1}')
-  local hashalo=$(echo "$SMILES" | awk -F"F|Br|Cl|I|S" '{print NF-1}')
-  local heavyatoms=$(echo $SMILES | obabel -ismiles -otxt --append atoms -d 2> /dev/null)
-
-  mv "$1" ./sdf-3d/$ID.sdf
-  echo "\"$ID\",\"$SMILES\",\"$positive\",\"$negative\",\"$hashalo\",\"$heavyatoms\",\"$abonds\",\"$atoms\",\"$bonds\",\"$dbonds\",\"$formula\",\"$HBA1\",\"$HBA2\",\"$HBD\",\"$InChI\",\"$InChIKey\",\"$logP\",\"$MP\",\"$MR\",\"$MW\",\"$nF\",\"$sbonds\",\"$tbonds\",\"$TPSA\"" >> ./meta/${ID:0:1}.csv
-  obabel ./sdf-3d/$ID.sdf -o pdbqt -O ./pdbqt/$ID.pdbqt &> babel-logs/babel-output-pdbqt-$date.log
-  }
-export -f getinfo_sdf
+  computed=($(obabel -isdf /dev/shm/babel/$1.sdf -r --append 'abonds atoms bonds dbonds formula HBA1 HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds TPSA' -osmi 2> /dev/null ))
+  positive=$(echo "${computed[0]}" | awk -F"+" '{print NF-1}')
+  negative=$(echo "${computed[0]}" | awk -F"-" '{print NF-1}')
+  hashalo=$(echo "${computed[0]}" | awk -F"F|Br|Cl|I|S" '{print NF-1}')
+  heavyatoms=$(echo ${computed[0]} | obabel -ismiles -otxt --append atoms -d 2> /dev/null)
+  ID=${computed[1]}
+  echo \"$ID ${computed[0]} $positive $negative $hashalo $heavyatoms ${computed[*]:2}\"|
+  sed -e 's/ /\"\,\"/g' >> ./meta/${ID:0:1}.csv
+  obabel -isdf /dev/shm/babel/$1.sdf -opdbqt -O "pdbqt/$ID.pdbqt" 2> /dev/null
+  rm /dev/shm/babel/$1.sdf
+}
+export -f getinfo_convert_sdf
 
 add_to_sql() {
   mysql -pa -e "use BABEL" -e "
@@ -139,6 +92,10 @@ while true
         then sdf_files+=("$1")
         else echo file not found: $1
       fi ; shift 1 ;;
+    *.mdl ) if [ -e "$1" ]
+        then sdf_files+=("$1")
+        else echo file not found: $1
+      fi ; shift 1 ;;
     *.smi ) if [ -e "$1" ]
         then smi_files+=("$1")
         else echo file not found: $1
@@ -155,6 +112,10 @@ while read -t 1 line
   do case $line in
     '' ) break ;;
     *.sdf ) if [ -e "$line" ]
+        then sdf_files+=("$line")
+        else echo file not found: $line
+      fi ; shift 1 ;;
+    *.mdl ) if [ -e "$line" ]
         then sdf_files+=("$line")
         else echo file not found: $line
       fi ; shift 1 ;;

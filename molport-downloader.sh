@@ -16,12 +16,12 @@ download_sdf() {
   last_date="$(echo ${date[*]} | rev | cut -d ' ' -f1 | rev)"
   array=( $(curl "$url${last_date}/All Stock Compounds/SMILES/" | grep '.gz' | rev | cut -d ' ' -f1 | rev) )
   for I in ${array[*]}
-  do echo curl -C - --limit-rate 2M "$url$i/All Stock Compounds/SMILES/$I" |
+  do curl -C - --limit-rate 2M "$url$last_date/All Stock Compounds/SMILES/$I" |
     gunzip | tail -n+2 >> molport.smi
   done
   for i in ${date[*]}
-  do curl "$url$i/All Stock Compounds/Changed Since Previous Update/lmiis_removed.txt.gz" |
-    gunzip | xargs -I{} rm $db_location/pdbqt/{}*
+  do curl "$url$last_date/All Stock Compounds/Changed Since Previous Update/lmiis_removed.txt.gz" |
+    gunzip | parallel -j2 -I{} rm $db_location/pdbqt/{}*
   done
 }
 
