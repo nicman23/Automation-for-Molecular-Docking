@@ -1,6 +1,4 @@
 #! /usr/bin/env bash
-date=$(date +%F)
-
 sane() {
   if [[ -z "${sdf_files[*]}" ]] && [[ -z "${smi_files[*]}" ]]
   then echo "No input file"
@@ -69,7 +67,7 @@ getinfo_convert_sdf() {
   ID=${computed[1]}
   echo \"$ID ${computed[0]} $positive $negative $hashalo $heavyatoms ${computed[*]:2}\"|
   sed -e 's/ /\"\,\"/g' >> ./meta/${ID:0:1}.csv
-  obabel -isdf /dev/shm/babel/$1.sdf -opdbqt -O "pdbqt/$ID.pdbqt" 2> /dev/null
+  obabel -isdf /dev/shm/babel/$1.sdf -r -opdbqt -O "pdbqt/$ID.pdbqt" 2> /dev/null
   rm /dev/shm/babel/$1.sdf
 }
 export -f getinfo_convert_sdf
