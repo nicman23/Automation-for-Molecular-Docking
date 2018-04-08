@@ -73,7 +73,7 @@ vinaSH --cpu 4 --config $vina_cfg --ligand "$1" $vina_rcp --out $out_dir/"$2" &>
 export vina_cfg vina_log vina_rcp out_dir
 export -f vina_fun
 echo Starting Docking:
-parallel --eta --progress -j $((threads/4)) --joblog /tmp/asd.log vina_fun $db_location/pdbqt/{}.pdbqt {/}.pdbqt
+parallel --eta --progress -j $((threads/4)) --joblog ../vina.job vina_fun {} {/}
 score() {
 mv "$*" $(sed '2q;d' "$*" | cut -d '-' -f 2 | cut -d ' ' -f1)_$*
 }
@@ -135,6 +135,11 @@ for I in ${DB[*]}
 done > query
 }
 
+find_names() {
+find $db_location/pdbqt -type f |
+parallel --pipe -j 4 grep -f ${1}query
+}
+
 if [ "$vina_cfg" ]
 then findoutput="$(find query -maxdepth 1 2> /dev/null)"
   if [ "$findoutput" ]
@@ -150,7 +155,7 @@ then findoutput="$(find query -maxdepth 1 2> /dev/null)"
     echo
     if [ -e ./query ]
     then
-      time cat query | vina_wrapper
+      time find_names | vina_wrapper
     fi
 else
   echo 'Searching - this could take a lot of time (see mysql threads)'
@@ -163,7 +168,7 @@ then
   (
     cd $out_dir || exit 5; mkdir results haloresults
     echo $PWD
-    cat ../query | xargs -I{} cp $db_location/pdbqt/{}.pdbqt results/
+    find_names ../ | parallel -I{} cp {} results/
     tar zcfv ../queryresults_$(date +'%s').tar.gz .
   )
   rm -rf $out_dir
