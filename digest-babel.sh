@@ -8,7 +8,7 @@ sane() {
   then echo Please use a non zero thread count
     exit 3
   fi
-  for i in babel-output meta sdf-2d sdf-3d babel-logs csplit-output pdbqt
+  for i in meta pdbqt
   do [ -e $i ] || mkdir $i
   done
 }

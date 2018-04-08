@@ -1,5 +1,4 @@
 #! /usr/bin/env bash
-#vina_cache="$HOME/.vina"
 ip=''
 user=''
 

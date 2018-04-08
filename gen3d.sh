@@ -53,8 +53,8 @@ main() {
   fi
   echo Converting $(wc -l to_convert) files
   parallel --progress -j $threads --colsep '\t' Frog_f {2} {1} :::: to_convert
-  add_to_sql ./meta/Frog.csv
-  # rm meta/Frog.csv
+  add_to_sql Frog ./meta/Frog.csv
+  rm meta/Frog.csv
 }
 
 sane() {
