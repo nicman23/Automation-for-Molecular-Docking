@@ -1,5 +1,6 @@
 #! /usr/bin/bash
 db_location='/home/common/babel'
+export db_location
 
 array_opt=( Pstv Ngtv abonds atoms bonds cansmi cansmiNS dbonds formula HBA1
 HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds TPSA heavya)
@@ -112,7 +113,7 @@ echo 'function getargs() {'
   echo '      --help            ) echo "$help_txt" ; exit 2 ;;
       --db              ) DB+=($2) ; shift 2 ;;
       --zinc-mode       ) zinc_mode=1 ; shift 1 ;;
-      --vina-threads    ) threads=$2 ; shift 2 ;;
+      --vina-threads    ) threads=$2 ; export threads ; shift 2 ;;
       --vina-cfg        ) vina_cfg=$2 ; shift 2 ;;
       --vina-rcp        ) vina_rcp="--receptor $2" ; shift 2 ;;
       --vina-rlt        ) results="$2" ; shift 2 ;;
@@ -136,8 +137,8 @@ done > query
 }
 
 find_names() {
-find $db_location/pdbqt -type f |
-parallel --pipe -j 4 grep -f ${1}query
+find ${db_location}/pdbqt -type f |
+parallel --pipe -j 5 grep -f "$1/query"
 }
 
 if [ "$vina_cfg" ]
@@ -161,16 +162,15 @@ else
   echo 'Searching - this could take a lot of time (see mysql threads)'
   db_loop
   read -p "Do you want the resulting pdbqts?" -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]
-then
-  out_dir=$(mktemp -d -p .)
-  (
-    cd $out_dir || exit 5; mkdir results haloresults
-    echo $PWD
-    find_names ../ | parallel -I{} cp {} results/
-    tar zcfv ../queryresults_$(date +'%s').tar.gz .
-  )
-  rm -rf $out_dir
-fi
+  echo
+  if [[ $REPLY =~ ^[Yy]$ ]]
+  then
+    out_dir=$(mktemp -d -p .)
+    (
+      cd $out_dir || exit 5
+      find_names .. | parallel -I{} cp {} .
+      tar zcfv ../queryresults_$(date +'%s').tar.gz .
+    )
+    rm -rf $out_dir
+  fi
 fi
