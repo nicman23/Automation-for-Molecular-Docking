@@ -14,7 +14,7 @@ get_links() {
 filter_json() {
 curl 'http://zinc15.docking.org/tranches/all3D.json' --compressed |
 jq -rc '.[] | select(.ph_mod_fk | match("[R]")) |
-select(.purchasable | match("[A-B]")) | select(.reactive | match("[A-C]")) |
+select(.purchasable | match("[A-B]")) | select(.reactive | match("[A-E]")) |
 select(.size != 0) | .name' | paste -s -d '+'
 }
 

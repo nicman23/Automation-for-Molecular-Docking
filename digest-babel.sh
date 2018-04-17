@@ -43,7 +43,7 @@ getinfo_smi() {
   while read lines
   do
     local line=($(echo "$lines" | cut -d "$(echo -e '\t')" -f -3))
-    local computed=($(echo ${line[0]}| obabel -ismi -r --append 'abonds atoms bonds dbonds formula HBA1 HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds TPSA' -osmi 2> /dev/null ))
+    local computed=($(echo ${line[0]}| obabel -ismi -p 7.4 -r --append 'abonds atoms bonds dbonds formula HBA1 HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds TPSA' -osmi 2> /dev/null ))
     local SMILES=${computed[0]}
     local ID=${line[2]}
     local positive=$(echo "$SMILES" | awk -F"+" '{print NF-1}')
@@ -59,7 +59,7 @@ export -f getinfo_smi
 getinfo_convert_sdf() {
   tail -n+2 > /dev/shm/babel/$1.sdf
 
-  computed=($(obabel -isdf /dev/shm/babel/$1.sdf -r --append 'abonds atoms bonds dbonds formula HBA1 HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds TPSA' -osmi 2> /dev/null ))
+  computed=($(obabel -isdf /dev/shm/babel/$1.sdf -p 7.4 -r --append 'abonds atoms bonds dbonds formula HBA1 HBA2 HBD InChI InChIKey logP MP MR MW nF sbonds tbonds TPSA' -osmi 2> /dev/null ))
   positive=$(echo "${computed[0]}" | awk -F"+" '{print NF-1}')
   negative=$(echo "${computed[0]}" | awk -F"-" '{print NF-1}')
   hashalo=$(echo "${computed[0]}" | awk -F"F|Br|Cl|I|S" '{print NF-1}')
