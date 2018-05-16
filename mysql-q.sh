@@ -45,22 +45,20 @@ fi
 
 
 query_writer() {
+line_start=WHERE
 for i in ${array_opt[*]}
-  do line_start=WHERE
-  [ "$first" ] && line_start=AND
+  do
   max_i=max_$i
   min_i=min_$i
   if [ "${!max_i}" ]
     then if [ "${!min_i}" ]
       then echo $line_start $I.\`$i\` BETWEEN ${!min_i} AND ${!max_i}
-      first=0
     else echo $line_start $I.\`$i\` \<\= ${!max_i}
-      first=0
     fi
     elif [ "${!min_i}" ]
       then echo $line_start $I.\`$i\` \>\= ${!min_i}
-      first=0
     fi
+  line_start=AND
 done
 echo $line_start $I.\`Halo\` $halo
 }
@@ -144,12 +142,12 @@ db_loop() {
 
 for I in ${DB[*]}
   do halo='= 0'
-  query_writer | mysql_q
+  query_writer | tee mysql | mysql_q
 done > query
 
 for I in ${DB[*]}
   do halo='> 0'
-  query_writer | mysql_q
+  query_writer | tee hmysql | mysql_q
 done > haloquery
 }
 
