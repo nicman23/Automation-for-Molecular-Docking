@@ -39,8 +39,7 @@ if [ ! "$I" = 'Zinc' ] && [ ! "$I" = 'Ambinter' ]
     SELECT ID
     FROM ${I}
     $(cat -)
-  ;
-  "
+    ;"
 fi
 }
 
@@ -67,7 +66,13 @@ echo $line_start $I.\`Halo\` $halo
 }
 
 vina_fun() {
-vinaSH --cpu 4 --config $vina_cfg --ligand "$1" $vina_rcp --out $out_dir/"$2" &> /dev/null
+mkdir "$1"
+cd "$1"
+obabel -ipdbqt "$db_location/pdbqt/$1.pdbqt" -opdbqt -O $1\_out.pdbqt -m &> /dev/null
+for i in $(find -name \*pdbqt | sed 's/\.pdbqt//g' )
+  do $vina --cpu 4 --config $vina_cfg --ligand "$i.pdbqt" $vina_rcp --out "$i_out.pdbqt" &> /dev/null
+  rm "$i.pdbqt"
+done
 }
 
 score() {
@@ -75,11 +80,15 @@ mv "$*" $(sed '2q;d' "$*" | cut -d '-' -f 2 | cut -d ' ' -f1)_$*
 }
 
 vina_wrapper() {
-out_dir=$(mktemp -d -p .)
-export vina_cfg vina_log vina_rcp out_dir
+export vina_cfg vina_log vina_rcp out_dir vina
 export -f vina_fun
+
+(
+cd $out_dir
 echo Starting Docking:
-parallel --eta --progress -j $((threads/4)) --joblog ../vina.job vina_fun $db_location/pdbqt/{}.pdbqt {/}.pdbqt
+parallel --eta --progress -j $((threads/4)) --joblog ../vina.job vina_fun {}
+)
+
 export -f score
 (
 cd $out_dir || exit 5
@@ -88,11 +97,11 @@ find . -type f -printf "%f\n" |
 parallel --progress -j $threads score {/}
 echo Tarring $results best results.
 find . -type f -printf "%f\n" | sort -h |
-tail -n $results | tar zcfv ../vinaSH-result_$(date +'%s').tar.gz \
+tail -n $results | tar zcfv ../$vina\-result_$(date +'%s').tar.gz \
 --files-from -
 )
 echo Deleting temporary files
-rm -rf $out_dir #results
+#rm -rf $out_dir #results
 echo Results are in vina-result_$(date +'%s').tar.gz
 }
 
@@ -132,10 +141,16 @@ eval "$(creategetargs ${array_opt[*]})"
 getargs $*
 
 db_loop() {
+
 for I in ${DB[*]}
   do halo='= 0'
   query_writer | mysql_q
 done > query
+
+for I in ${DB[*]}
+  do halo='> 0'
+  query_writer | mysql_q
+done > haloquery
 }
 
 if [ "$vina_cfg" ]
@@ -153,7 +168,13 @@ then findoutput="$(find query -maxdepth 1 2> /dev/null)"
     echo
     if [ -e ./query ]
     then
+      out_dir=$(mktemp -d -p .)
+
+      vina='vina'
       cat query | vina_wrapper
+      vina='vinaSH'
+      cat haloquery | vina_wrapper
+
     fi
 else
   echo 'Searching - this could take a lot of time (see mysql threads)'

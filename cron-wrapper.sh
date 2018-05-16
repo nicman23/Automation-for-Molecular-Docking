@@ -15,7 +15,7 @@ threads=20
 
   wget -c --limit-rate=3m http://files.docking.org/catalogs/50/molportbbe/molportbbe.info.txt.gz
   wget -c --limit-rate=3m http://files.docking.org/catalogs/50/molporte/molporte.info.txt.gz
-  wget -c --limit-rate=3m http://files.docking.org/catalogs/10/ambint/ambint.info.txt.gz
+#  wget -c --limit-rate=3m http://files.docking.org/catalogs/10/ambint/ambint.info.txt.gz
   find . -name '*.gz' -type f -exec gunzip {} \;
   zinc-to-third.sh molportbbe.info.txt molporte.info.txt # ambint.info.txt
 )
@@ -24,4 +24,4 @@ find Downloads-tmp -type f | grep 'smi\|sdf\|mdl'|
 digest-babel.sh -T $threads
 gen3d.sh $threads
 
-rm -rf Downloads-tmp
+#rm -rf Downloads-tmp
