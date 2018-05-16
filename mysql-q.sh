@@ -53,12 +53,13 @@ for i in ${array_opt[*]}
   if [ "${!max_i}" ]
     then if [ "${!min_i}" ]
       then echo $line_start $I.\`$i\` BETWEEN ${!min_i} AND ${!max_i}
-    else echo $line_start $I.\`$i\` \<\= ${!max_i}
-    fi
+      else echo $line_start $I.\`$i\` \<\= ${!max_i}
+      fi
+      line_start=AND
     elif [ "${!min_i}" ]
       then echo $line_start $I.\`$i\` \>\= ${!min_i}
+      line_start=AND
     fi
-  line_start=AND
 done
 echo $line_start $I.\`Halo\` $halo
 }
